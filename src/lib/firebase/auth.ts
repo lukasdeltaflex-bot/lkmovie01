@@ -17,32 +17,38 @@ const microsoftProvider = new OAuthProvider("microsoft.com");
 
 // Email/Password
 export const signUpWithEmail = (email: string, pass: string) => {
-  if (!auth) throw new Error("Firebase Auth not initialized");
+  if (!auth) throw new Error("Firebase Auth não inicializado ou sem chaves de API.");
   return createUserWithEmailAndPassword(auth, email, pass);
 };
 
 export const signInWithEmail = (email: string, pass: string) => {
-  if (!auth) throw new Error("Firebase Auth not initialized");
+  if (!auth) throw new Error("Firebase Auth não inicializado ou sem chaves de API.");
   return signInWithEmailAndPassword(auth, email, pass);
 };
 
 // Social Logins
-export const signInWithGoogle = () => {
-  if (!auth) throw new Error("Firebase Auth not initialized");
+export const signInWithGoogle = async () => {
+  if (!auth) throw new Error("Firebase Auth não inicializado.");
   
-  // Forçar seleção de conta para evitar erros de sessão persistente no build
-  googleProvider.setCustomParameters({ prompt: 'select_account' });
-  
-  return signInWithPopup(auth, googleProvider);
+  try {
+    googleProvider.setCustomParameters({ prompt: 'select_account' });
+    return await signInWithPopup(auth, googleProvider);
+  } catch (error: any) {
+    console.error("Erro no Google Auth:", error);
+    throw error;
+  }
 };
 
-export const signInWithMicrosoft = () => {
-  if (!auth) throw new Error("Firebase Auth not initialized");
+export const signInWithMicrosoft = async () => {
+  if (!auth) throw new Error("Firebase Auth não inicializado.");
   
-  // Configurações recomendadas para Microsoft Azure AD
-  microsoftProvider.setCustomParameters({ prompt: 'select_account' });
-  
-  return signInWithPopup(auth, microsoftProvider);
+  try {
+    microsoftProvider.setCustomParameters({ prompt: 'select_account' });
+    return await signInWithPopup(auth, microsoftProvider);
+  } catch (error: any) {
+    console.error("Erro no Microsoft Auth:", error);
+    throw error;
+  }
 };
 
 // Utilities
@@ -52,7 +58,7 @@ export const sendVerificationEmail = (user: User) => {
 };
 
 export const sendResetPasswordEmail = (email: string) => {
-  if (!auth) throw new Error("Firebase Auth not initialized");
+  if (!auth) throw new Error("Firebase Auth não inicializado.");
   return sendPasswordResetEmail(auth, email);
 };
 

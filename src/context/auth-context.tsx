@@ -18,17 +18,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Se o auth não estiver inicializado (build time), aborta silenciosamente
+    // Se o auth não estiver inicializado (build time ou erro de config), aborta silenciosamente
     if (!auth) {
+      console.warn("Firebase Auth não inicializado no AuthProvider.");
       setLoading(false);
       return;
     }
 
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+    try {
+      const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+        setUser(currentUser);
+        setLoading(false);
+      }, (error) => {
+        console.error("Erro no onAuthStateChanged:", error);
+        setLoading(false);
+      });
+      return () => unsubscribe();
+    } catch (err) {
+      console.error("Falha ao escutar mudanças de autenticação:", err);
       setLoading(false);
-    });
-    return () => unsubscribe();
+    }
   }, []);
 
   const triggerVerification = async () => {

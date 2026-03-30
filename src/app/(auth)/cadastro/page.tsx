@@ -11,6 +11,7 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
   const router = useRouter();
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -27,12 +28,14 @@ export default function RegisterPage() {
     try {
       const userCredential = await signUpWithEmail(email, password);
       await sendVerificationEmail(userCredential.user);
-      router.push("/dashboard");
+      setSuccess(true);
+      setTimeout(() => router.push("/dashboard"), 2000);
     } catch (err: any) {
+      console.error("Erro no cadastro:", err);
       if (err.code === "auth/email-already-in-use") {
         setError("Este e-mail já está em uso.");
       } else {
-        setError("Ocorreu um erro ao criar a conta.");
+        setError(err.message || "Erro desconhecido ao criar conta.");
       }
     } finally {
       setLoading(false);
@@ -45,6 +48,7 @@ export default function RegisterPage() {
       await signInWithGoogle();
       router.push("/dashboard");
     } catch (err: any) {
+      console.error("Erro Google Auth:", err);
       if (err.code !== 'auth/popup-closed-by-user') {
         setError("Erro com o Google. Tente novamente.");
       }
@@ -57,6 +61,7 @@ export default function RegisterPage() {
       await signInWithMicrosoft();
       router.push("/dashboard");
     } catch (err: any) {
+      console.error("Erro Microsoft Auth:", err);
       if (err.code !== 'auth/popup-closed-by-user') {
         setError("Erro com o Microsoft. Tente novamente.");
       }
@@ -74,6 +79,12 @@ export default function RegisterPage() {
         {error && (
           <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm rounded-xl text-center font-bold">
             {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-400 text-sm rounded-xl text-center font-bold">
+            Conta criada com sucesso! Redirecionando...
           </div>
         )}
 
@@ -113,16 +124,16 @@ export default function RegisterPage() {
           </div>
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || success}
             className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-400 text-white rounded-2xl font-bold shadow-lg transition-all transform active:scale-95"
           >
-            {loading ? "Processando..." : "Criar minha conta"}
+            {loading ? "Processando..." : success ? "Sucesso!" : "Criar minha conta"}
           </button>
         </form>
 
         <div className="my-8 flex items-center gap-4">
           <div className="flex-1 h-px bg-gray-200 dark:bg-gray-800"></div>
-          <span className="text-xs text-gray-400 font-bold">OU CADASTRE-SE COM</span>
+          <span className="text-xs text-gray-400 font-bold uppercase tracking-widest">Ou</span>
           <div className="flex-1 h-px bg-gray-200 dark:bg-gray-800"></div>
         </div>
 
@@ -152,7 +163,7 @@ export default function RegisterPage() {
         </div>
 
         <p className="mt-8 text-center text-sm text-gray-500 dark:text-gray-400">
-          Já tem conta? <Link href="/login" className="text-blue-600 hover:text-blue-500 font-bold">Acesse aqui</Link>
+          Já tem conta? <Link href="/login" className="text-blue-600 hover:text-blue-500 font-bold ml-1 hover:underline">Acesse aqui</Link>
         </p>
       </div>
     </div>

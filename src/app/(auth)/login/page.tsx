@@ -20,7 +20,8 @@ export default function LoginPage() {
       await signInWithEmail(email, password);
       router.push("/dashboard");
     } catch (err: any) {
-      setError("Credenciais inválidas. Verifique seu e-mail e senha.");
+      console.error("Erro no login:", err);
+      setError("Verifique seu e-mail e senha. Detalhe: " + (err.message || "Erro desconhecido."));
     } finally {
       setLoading(false);
     }
@@ -32,8 +33,11 @@ export default function LoginPage() {
       await signInWithGoogle();
       router.push("/dashboard");
     } catch (err: any) {
-      if (err.code !== 'auth/popup-closed-by-user') {
-        setError("Erro ao autenticar com Google. Tente novamente.");
+      console.error("Erro no Google Auth:", err);
+      if (err.code === 'auth/popup-blocked') {
+        setError("Pop-up bloqueado. Permita janelas pop-up para este site.");
+      } else if (err.code !== 'auth/popup-closed-by-user') {
+        setError("Erro ao autenticar com Google: " + err.message);
       }
     }
   };
@@ -44,18 +48,21 @@ export default function LoginPage() {
       await signInWithMicrosoft();
       router.push("/dashboard");
     } catch (err: any) {
-      if (err.code !== 'auth/popup-closed-by-user') {
-        setError("Erro ao autenticar com Microsoft. Verifique se o provedor está habilitado.");
+      console.error("Erro no Microsoft Auth:", err);
+      if (err.code === 'auth/popup-blocked') {
+        setError("Pop-up bloqueado. Permita janelas pop-up para este site.");
+      } else if (err.code !== 'auth/popup-closed-by-user') {
+        setError("Erro com Microsoft. Verifique se o provedor está habilitado no Firebase.");
       }
     }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 p-4">
-      <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-3xl shadow-2xl p-8 border border-gray-100 dark:border-gray-800 animate-in fade-in zoom-in duration-500">
+      <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-3xl shadow-2xl p-8 border border-gray-100 dark:border-gray-800 animate-in fade-in zoom-in duration-500 relative z-10">
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-blue-600 mb-2">LKMOVIE01</h1>
-          <p className="text-gray-500 dark:text-gray-400">Bem-vindo de volta! Acesse sua conta.</p>
+          <p className="text-gray-500 dark:text-gray-400">Acesse sua conta para continuar</p>
         </div>
 
         {error && (
@@ -79,7 +86,7 @@ export default function LoginPage() {
           <div className="space-y-1">
             <div className="flex justify-between items-center px-1">
                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Senha</label>
-               <Link href="/esqueci-senha" className="text-xs text-blue-600 hover:text-blue-500 font-medium">Esqueceu a senha?</Link>
+               <Link href="/esqueci-senha" data-testid="forgot-password-link" className="text-xs text-blue-600 hover:text-blue-500 font-bold">Esqueceu a senha?</Link>
             </div>
             <input
               type="password"
@@ -95,13 +102,13 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-400 text-white rounded-2xl font-bold shadow-lg transition-all transform active:scale-95"
           >
-            {loading ? "Autenticando..." : "Entrar com E-mail"}
+            {loading ? "Entrando..." : "Entrar com E-mail"}
           </button>
         </form>
 
         <div className="my-8 flex items-center gap-4">
           <div className="flex-1 h-px bg-gray-200 dark:bg-gray-800"></div>
-          <span className="text-xs text-gray-400 font-bold">OU CONTINUAR COM</span>
+          <span className="text-xs text-gray-400 font-bold uppercase tracking-widest">Ou</span>
           <div className="flex-1 h-px bg-gray-200 dark:bg-gray-800"></div>
         </div>
 
@@ -130,9 +137,16 @@ export default function LoginPage() {
           </button>
         </div>
 
-        <p className="mt-8 text-center text-sm text-gray-500 dark:text-gray-400">
-          Novo por aqui? <Link href="/cadastro" className="text-blue-600 hover:text-blue-500 font-bold">Crie sua conta</Link>
-        </p>
+        <div className="mt-8 text-center text-sm text-gray-500 dark:text-gray-400">
+          Novo por aqui? 
+          <Link 
+            href="/cadastro" 
+            className="text-blue-600 hover:text-blue-500 font-bold ml-1 inline-block hover:underline"
+            onClick={() => console.log("Navegando para cadastro...")}
+          >
+            Crie sua conta
+          </Link>
+        </div>
       </div>
     </div>
   );
