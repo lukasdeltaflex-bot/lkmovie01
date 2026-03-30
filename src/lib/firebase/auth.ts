@@ -26,13 +26,21 @@ export const signInWithEmail = (email: string, pass: string) => {
 
 // Social Logins
 export const signInWithGoogle = async () => {
-  if (!auth) throw new Error("Firebase Auth não inicializado.");
+  if (!auth) {
+    console.error("Firebase Auth instance is null. Check environment variables.");
+    throw new Error("Erro de configuração de autenticação. O serviço não foi inicializado.");
+  }
   
   try {
     googleProvider.setCustomParameters({ prompt: 'select_account' });
-    return await signInWithPopup(auth, googleProvider);
+    const result = await signInWithPopup(auth, googleProvider);
+    return result;
   } catch (error: any) {
-    console.error("Erro no Google Auth:", error);
+    console.error("Erro detalhado no Google Auth:", {
+      code: error.code,
+      message: error.message,
+      full: error
+    });
     throw error;
   }
 };
