@@ -12,6 +12,30 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
+  // Helper para mapear erros comuns do Firebase para mensagens amigáveis
+  const getErrorMessage = (err: any) => {
+    const code = err.code || "";
+    if (code === "auth/invalid-credential" || code === "auth/user-not-found" || code === "auth/wrong-password") {
+      return "E-mail ou senha incorretos. Verifique os dados.";
+    }
+    if (code === "auth/invalid-email") {
+      return "E-mail inválido.";
+    }
+    if (code === "auth/too-many-requests") {
+      return "Conta temporariamente bloqueada por excesso de tentativas. Tente mais tarde.";
+    }
+    if (code === "auth/popup-blocked") {
+      return "O pop-up de login foi bloqueado pelo seu navegador.";
+    }
+    if (code === "auth/popup-closed-by-user") {
+      return "Login com Google cancelado.";
+    }
+    if (code === "auth/operation-not-allowed") {
+      return "O login com Google não está habilitado no Console do Firebase.";
+    }
+    return err.message || "Ocorreu um erro inesperado. Tente novamente.";
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -20,8 +44,8 @@ export default function LoginPage() {
       await signInWithEmail(email, password);
       router.push("/dashboard");
     } catch (err: any) {
-      console.error("Erro no login:", err);
-      setError("Verifique seu e-mail e senha. Detalhe: " + (err.message || "Erro desconhecido."));
+      console.error("Login Falhou:", err);
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -31,20 +55,11 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      console.log("Tentando login com Google...");
       await signInWithGoogle();
       router.push("/dashboard");
     } catch (err: any) {
-      console.error("Google Login falhou:", err);
-      if (err.code === 'auth/popup-blocked') {
-        setError("Pop-up bloqueado. Por favor, permita janelas pop-up para continuar.");
-      } else if (err.code === 'auth/popup-closed-by-user') {
-        setError("Autenticação cancelada pelo usuário.");
-      } else if (err.code === 'auth/operation-not-allowed') {
-        setError("O login com Google não está habilitado no Console do Firebase.");
-      } else {
-        setError("Erro ao autenticar com Google: " + (err.message || "Tente novamente."));
-      }
+      console.error("Google Auth Falhou:", err);
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }

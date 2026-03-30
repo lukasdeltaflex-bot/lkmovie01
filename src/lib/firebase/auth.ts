@@ -6,57 +6,111 @@ import {
   sendEmailVerification, 
   sendPasswordResetEmail, 
   signOut, 
-  User 
+  User,
+  Auth
 } from "firebase/auth";
 import { auth } from "./config";
 
-// Providers
+// Provedores
 const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 
-// Email/Password
-export const signUpWithEmail = (email: string, pass: string) => {
-  if (!auth) throw new Error("Firebase Auth não inicializado ou sem chaves de API.");
-  return createUserWithEmailAndPassword(auth, email, pass);
-};
-
-export const signInWithEmail = (email: string, pass: string) => {
-  if (!auth) throw new Error("Firebase Auth não inicializado ou sem chaves de API.");
-  return signInWithEmailAndPassword(auth, email, pass);
-};
-
-// Social Logins
-export const signInWithGoogle = async () => {
+// Função interna para validar a instância com erro amigável e detalhado
+const getValidatedAuth = (): Auth => {
   if (!auth) {
-    console.error("Firebase Auth instance is null. Check environment variables.");
-    throw new Error("Erro de configuração de autenticação. O serviço não foi inicializado.");
+    const missingKeys = [
+      'NEXT_PUBLIC_FIREBASE_API_KEY',
+      'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
+      'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
+      'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET',
+      'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
+      'NEXT_PUBLIC_FIREBASE_APP_ID'
+    ].filter(key => !process.env[key]);
+
+    const errorMsg = missingKeys.length > 0 
+      ? `Firebase Auth não inicializado. Faltam as variáveis: ${missingKeys.join(", ")}.`
+      : "Firebase Auth falhou na inicialização. Verifique o console para erros de configuração.";
+    
+    throw new Error(errorMsg);
   }
-  
+  return auth;
+};
+
+// Funções de Autenticação Exportadas
+
+/**
+ * Cadastro com E-mail e Senha
+ */
+export const signUpWithEmail = async (email: string, pass: string) => {
+  const firebaseAuth = getValidatedAuth();
   try {
-    googleProvider.setCustomParameters({ prompt: 'select_account' });
-    const result = await signInWithPopup(auth, googleProvider);
-    return result;
+    return await createUserWithEmailAndPassword(firebaseAuth, email, pass);
   } catch (error: any) {
-    console.error("Erro detalhado no Google Auth:", {
-      code: error.code,
-      message: error.message,
-      full: error
-    });
+    console.error("signUpWithEmail error code:", error.code);
     throw error;
   }
 };
 
-// Utilities
-export const sendVerificationEmail = (user: User) => {
-  if (!auth) return Promise.resolve();
-  return sendEmailVerification(user);
+/**
+ * Login com E-mail e Senha
+ */
+export const signInWithEmail = async (email: string, pass: string) => {
+  const firebaseAuth = getValidatedAuth();
+  try {
+    return await signInWithEmailAndPassword(firebaseAuth, email, pass);
+  } catch (error: any) {
+    console.error("signInWithEmail error code:", error.code);
+    throw error;
+  }
 };
 
-export const sendResetPasswordEmail = (email: string) => {
-  if (!auth) throw new Error("Firebase Auth não inicializado.");
-  return sendPasswordResetEmail(auth, email);
+/**
+ * Login com Google
+ */
+export const signInWithGoogle = async () => {
+  const firebaseAuth = getValidatedAuth();
+  try {
+    return await signInWithPopup(firebaseAuth, googleProvider);
+  } catch (error: any) {
+    console.error("signInWithGoogle error code:", error.code, error.message);
+    throw error;
+  }
 };
 
-export const signOutUser = () => {
-  if (!auth) return Promise.resolve();
-  return signOut(auth);
+/**
+ * Envio de E-mail de Verificação
+ */
+export const sendVerificationEmail = async (user: User) => {
+  try {
+    return await sendEmailVerification(user);
+  } catch (error: any) {
+    console.error("sendVerificationEmail error code:", error.code);
+    throw error;
+  }
+};
+
+/**
+ * Reset de Senha (E-mail)
+ */
+export const sendResetPasswordEmail = async (email: string) => {
+  const firebaseAuth = getValidatedAuth();
+  try {
+    return await sendPasswordResetEmail(firebaseAuth, email);
+  } catch (error: any) {
+    console.error("sendResetPasswordEmail error code:", error.code);
+    throw error;
+  }
+};
+
+/**
+ * Logout
+ */
+export const signOutUser = async () => {
+  const firebaseAuth = getValidatedAuth();
+  try {
+    return await signOut(firebaseAuth);
+  } catch (error: any) {
+    console.error("signOut error code:", error.code);
+    throw error;
+  }
 };

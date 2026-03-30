@@ -14,6 +14,27 @@ export default function RegisterPage() {
   const [success, setSuccess] = useState(false);
   const router = useRouter();
 
+  // Mapeamento de erros amigáveis
+  const getErrorMessage = (err: any) => {
+    const code = err.code || "";
+    if (code === "auth/email-already-in-use") {
+      return "Este e-mail já está em uso por outra conta.";
+    }
+    if (code === "auth/weak-password") {
+      return "A senha é muito fraca. Use pelo menos 6 caracteres.";
+    }
+    if (code === "auth/invalid-email") {
+      return "E-mail inválido.";
+    }
+    if (code === "auth/operation-not-allowed") {
+      return "O cadastro com este método não está habilitado no Console do Firebase.";
+    }
+    if (code === "auth/popup-blocked") {
+      return "Pop-up bloqueado. Permita janelas pop-up para continuar.";
+    }
+    return err.message || "Erro inesperado ao criar conta.";
+  };
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -33,16 +54,19 @@ export default function RegisterPage() {
 
     try {
       const userCredential = await signUpWithEmail(email, password);
-      await sendVerificationEmail(userCredential.user);
-      setSuccess(true);
-      setTimeout(() => router.push("/dashboard"), 2000);
-    } catch (err: any) {
-      console.error("Erro no cadastro:", err);
-      if (err.code === "auth/email-already-in-use") {
-        setError("Este e-mail já está em uso.");
-      } else {
-        setError(err.message || "Erro desconhecido ao criar conta.");
+      
+      // Tenta enviar verificação mas não trava o fluxo se falhar (ex: limite de cota)
+      try {
+        await sendVerificationEmail(userCredential.user);
+      } catch (e) {
+        console.warn("Não foi possível enviar e-mail de verificação agora:", e);
       }
+
+      setSuccess(true);
+      setTimeout(() => router.push("/dashboard"), 1500);
+    } catch (err: any) {
+      console.error("Cadastro Falhou:", err);
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -52,18 +76,11 @@ export default function RegisterPage() {
     setError("");
     setLoading(true);
     try {
-      console.log("Tentando cadastro com Google...");
       await signInWithGoogle();
       router.push("/dashboard");
     } catch (err: any) {
-      console.error("Google Registration falhou:", err);
-      if (err.code === 'auth/popup-blocked') {
-        setError("Pop-up bloqueado. Por favor, permita janelas pop-up para continuar.");
-      } else if (err.code === 'auth/popup-closed-by-user') {
-        setError("Cadastro cancelado pelo usuário.");
-      } else {
-        setError("Erro ao cadastrar com Google: " + (err.message || "Tente novamente."));
-      }
+      console.error("Google Registration Falhou:", err);
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
