@@ -3,7 +3,6 @@ import {
   signInWithEmailAndPassword, 
   signInWithPopup, 
   GoogleAuthProvider, 
-  OAuthProvider,
   sendEmailVerification, 
   sendPasswordResetEmail, 
   signOut, 
@@ -13,7 +12,6 @@ import { auth } from "./config";
 
 // Providers
 const googleProvider = new GoogleAuthProvider();
-const microsoftProvider = new OAuthProvider("microsoft.com");
 
 // Email/Password
 export const signUpWithEmail = (email: string, pass: string) => {
@@ -35,18 +33,6 @@ export const signInWithGoogle = async () => {
     return await signInWithPopup(auth, googleProvider);
   } catch (error: any) {
     console.error("Erro no Google Auth:", error);
-    throw error;
-  }
-};
-
-export const signInWithMicrosoft = async () => {
-  if (!auth) throw new Error("Firebase Auth não inicializado.");
-  
-  try {
-    microsoftProvider.setCustomParameters({ prompt: 'select_account' });
-    return await signInWithPopup(auth, microsoftProvider);
-  } catch (error: any) {
-    console.error("Erro no Microsoft Auth:", error);
     throw error;
   }
 };
