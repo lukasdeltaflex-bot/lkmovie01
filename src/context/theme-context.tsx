@@ -31,21 +31,25 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!mounted) return;
 
-    const root = window.document.documentElement;
-    
     const applyTheme = (currentTheme: Theme) => {
-      root.classList.remove("light", "dark");
-
+      const root = window.document.documentElement;
+      
+      // Determina se deve ser dark
+      let isDark = currentTheme === "dark";
       if (currentTheme === "system") {
-        const matches = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        root.classList.add(matches ? "dark" : "light");
-      } else {
-        root.classList.add(currentTheme);
+        isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
       }
+
+      if (isDark) {
+        root.classList.add("dark");
+      } else {
+        root.classList.remove("dark");
+      }
+      
+      localStorage.setItem("theme", currentTheme);
     };
 
     applyTheme(theme);
-    localStorage.setItem("theme", theme);
 
     // Listener para mudancas no sistema (caso esteja em modo system)
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");

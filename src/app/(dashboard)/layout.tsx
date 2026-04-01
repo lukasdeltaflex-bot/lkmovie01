@@ -47,8 +47,12 @@ export default function DashboardLayout({
         >
           {/* Header Global Flutuante / Home Mobile Trigger */}
           <div className="flex justify-between md:justify-end items-center sticky top-0 z-30 mb-8 pointer-events-none">
-             <div className="md:hidden pointer-events-auto bg-white/80 dark:bg-gray-950/80 backdrop-blur-md p-2 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-xl">
-                <span className="text-2xl">{branding.logo}</span>
+             <div className="md:hidden pointer-events-auto bg-white/80 dark:bg-gray-950/80 backdrop-blur-md p-2 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-xl w-12 h-12 flex items-center justify-center overflow-hidden">
+                {branding.logo.length > 2 ? (
+                  <img src={branding.logo} alt="Logo" className="w-8 h-8 object-contain" />
+                ) : (
+                  <span className="text-2xl">{branding.logo}</span>
+                )}
              </div>
              <div className="pointer-events-auto">
                 <NotificationBell />

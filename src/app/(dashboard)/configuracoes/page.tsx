@@ -146,12 +146,19 @@ export default function ConfiguracoesPage() {
                     />
                   </div>
                   <div className="space-y-3">
-                    <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] ml-2">Símbolo (Identidade em Emoji)</label>
-                    <Input 
-                      value={localBranding.logo} 
-                      onChange={(e) => setLocalBranding({...localBranding, logo: e.target.value})}
-                      className="h-16 text-center text-3xl rounded-2xl bg-gray-50 dark:bg-black/50 border-gray-100 dark:border-gray-800"
-                    />
+                    <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] ml-2">Logotipo (Emoji ou Imagem)</label>
+                    <div className="flex gap-4">
+                       <Input 
+                        value={localBranding.logo} 
+                        onChange={(e) => setLocalBranding({...localBranding, logo: e.target.value})}
+                        placeholder="Emoji (ex: 🎥)"
+                        className="h-16 w-32 text-center text-3xl rounded-2xl bg-gray-50 dark:bg-black/50 border-gray-100 dark:border-gray-800"
+                       />
+                       <label className="flex-1 h-16 border-4 border-dashed border-gray-100 dark:border-gray-800 rounded-2xl flex items-center justify-center cursor-pointer hover:bg-gray-50 dark:hover:bg-black/40 transition-all font-black text-[10px] uppercase tracking-widest text-gray-400">
+                          {localBranding.logo.length > 2 ? "Substituir Imagem" : "Carregar PNG/JPG"}
+                          <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e, "logo")} />
+                       </label>
+                    </div>
                   </div>
                 </div>
 
