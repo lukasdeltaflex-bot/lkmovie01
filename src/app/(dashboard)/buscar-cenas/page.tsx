@@ -94,7 +94,7 @@ export default function BuscarCenasPage() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Ex: Cyberpunk 2077 Night City 4k..."
-                  className="w-full h-20 rounded-3xl text-2xl px-10 bg-white/95 border-none shadow-2xl text-gray-950 placeholder:text-gray-400 focus:ring-8 focus:ring-black/10 transition-all font-black"
+                  className="w-full h-20 rounded-3xl text-2xl px-10 bg-white border-white shadow-2xl text-gray-900 placeholder:text-gray-400 focus:ring-8 focus:ring-white/20 transition-all font-black"
                 />
                 <div className="absolute inset-y-0 right-6 flex items-center pointer-events-none opacity-0 group-focus-within:opacity-100 transition-opacity">
                    <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-gray-400 text-sm font-black border border-gray-200">ENT</div>
