@@ -6,6 +6,8 @@ import { useAuth } from "@/context/auth-context";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { SelectedVideoProvider } from "@/context/selected-video-context";
 import { useLayout } from "@/context/layout-context";
+import { NotificationBell } from "@/components/dashboard/NotificationBell";
+import { useBranding } from "@/context/branding-context";
 
 export default function DashboardLayout({
   children,
@@ -14,6 +16,7 @@ export default function DashboardLayout({
 }) {
   const { user, loading } = useAuth();
   const { sidebarCollapsed } = useLayout();
+  const { branding } = useBranding();
   const router = useRouter();
 
   useEffect(() => {
@@ -35,14 +38,24 @@ export default function DashboardLayout({
 
   return (
     <SelectedVideoProvider>
-      <div className="flex h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors duration-300">
+      <div className="flex h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors duration-300 overflow-hidden">
         <Sidebar />
         <main 
-          className={`flex-1 overflow-y-auto p-4 md:p-8 transition-all duration-300 ${
-            sidebarCollapsed ? "ml-0 md:ml-20" : "ml-0 md:ml-64"
+          className={`flex-1 overflow-y-auto p-4 md:p-8 transition-all duration-300 w-full ${
+            sidebarCollapsed ? "md:ml-20" : "md:ml-64"
           }`}
         >
-          <div className="max-w-[1600px] mx-auto">
+          {/* Header Global Flutuante / Home Mobile Trigger */}
+          <div className="flex justify-between md:justify-end items-center sticky top-0 z-30 mb-8 pointer-events-none">
+             <div className="md:hidden pointer-events-auto bg-white/80 dark:bg-gray-950/80 backdrop-blur-md p-2 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-xl">
+                <span className="text-2xl">{branding.logo}</span>
+             </div>
+             <div className="pointer-events-auto">
+                <NotificationBell />
+             </div>
+          </div>
+
+          <div className="max-w-[1600px] mx-auto w-full">
             {children}
           </div>
         </main>
