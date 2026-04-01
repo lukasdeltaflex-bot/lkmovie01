@@ -51,7 +51,7 @@ export default function BuscarCenasPage() {
       }
     } catch (err: any) {
       console.error(err);
-      setError("Erro ao buscar vídeos. Verifique se sua chave da API está correta ou tente novamente.");
+      setError(err.message || "Erro desconhecido na busca. Tente novamente.");
     } finally {
       setLoading(false);
     }

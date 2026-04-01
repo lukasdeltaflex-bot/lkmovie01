@@ -25,7 +25,11 @@ export async function GET(request: Request) {
     const data = await response.json();
 
     if (!response.ok) {
-      return NextResponse.json({ error: data.error?.message || "YouTube API error" }, { status: response.status });
+      console.error("DEBUG - YouTube API Error Data:", data);
+      return NextResponse.json({ 
+        error: data.error?.message || "YouTube API error", 
+        details: data.error?.errors?.[0]?.reason || "Unknown"
+      }, { status: response.status });
     }
 
     const videos = data.items.map((item: any) => ({
