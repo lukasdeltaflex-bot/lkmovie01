@@ -1,0 +1,2 @@
+﻿src/app/(dashboard)/configuracoes/page.tsx(177,17): error TS2304: Cannot find name 'Link'.
+src/app/(dashboard)/configuracoes/page.tsx(181,18): error TS2304: Cannot find name 'Link'.

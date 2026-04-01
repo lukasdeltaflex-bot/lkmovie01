@@ -46,6 +46,20 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (mounted) {
       localStorage.setItem("branding_config", JSON.stringify(branding));
+      
+      // Aplicar variáveis CSS globais
+      const root = document.documentElement;
+      root.style.setProperty("--primary", branding.primaryColor);
+      root.style.setProperty("--secondary", branding.secondaryColor);
+      
+      // Gerar versões RGBA para transparências se necessário
+      const hexToRgb = (hex: string) => {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : null;
+      };
+      
+      const rgbPrimary = hexToRgb(branding.primaryColor);
+      if (rgbPrimary) root.style.setProperty("--primary-rgb", rgbPrimary);
     }
   }, [branding, mounted]);
 
