@@ -22,7 +22,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     if (savedTheme) {
       setThemeState(savedTheme);
     } else {
-      // Padrao se nao houver salvo
       setThemeState("dark");
     }
   }, []);
@@ -33,9 +32,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
     const applyTheme = (currentTheme: Theme) => {
       const root = window.document.documentElement;
-      
-      // Determina se deve ser dark
       let isDark = currentTheme === "dark";
+      
       if (currentTheme === "system") {
         isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
       }
@@ -67,10 +65,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setThemeState(newTheme);
   };
 
-  // Evita Hydration Mismatch mas permite renderizar se montado
   return (
     <ThemeContext.Provider value={{ theme, setTheme }}>
-      <div style={{ opacity: mounted ? 1 : 0 }}>
+      {/* 
+        Garantimos que o App renderize com visibilidade apenas após o mount 
+        para evitar flicker de temas e garantir que as classes do root estejam prontas.
+      */}
+      <div style={{ visibility: mounted ? "visible" : "hidden" }} className="h-full">
         {children}
       </div>
     </ThemeContext.Provider>
