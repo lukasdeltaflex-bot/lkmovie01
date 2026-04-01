@@ -6,36 +6,19 @@ export interface YouTubeVideo {
 }
 
 export async function searchYouTubeVideos(query: string): Promise<YouTubeVideo[]> {
-  const apiKey = process.env.YOUTUBE_API_KEY;
-  
-  if (!apiKey) {
-    console.error("YOUTUBE_API_KEY is not defined");
-    return [];
-  }
-
-  const url = new URL("https://www.googleapis.com/youtube/v3/search");
-  url.searchParams.append("part", "snippet");
-  url.searchParams.append("maxResults", "10");
-  url.searchParams.append("type", "video");
-  url.searchParams.append("q", query);
-  url.searchParams.append("key", apiKey);
-
   try {
-    const response = await fetch(url.toString());
+    // Chamada à nossa API Interna segura no SERVIDOR (Next.js API Route)
+    const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error?.message || "YouTube API error");
+      throw new Error(data.error || "Erro na busca interna");
     }
 
-    return data.items.map((item: any) => ({
-      id: item.id.videoId,
-      title: item.snippet.title,
-      thumbnail: item.snippet.thumbnails.medium.url,
-      channelTitle: item.snippet.channelTitle,
-    }));
+    // Se for sucesso, data já vem no formato YouTubeVideo[] do nosso backend
+    return data as YouTubeVideo[];
   } catch (error) {
-    console.error("Error searching YouTube:", error);
+    console.error("Error searching via local API:", error);
     return [];
   }
 }
