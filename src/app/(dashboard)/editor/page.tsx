@@ -3,13 +3,18 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useSelectedVideo } from "@/context/selected-video-context";
+import { useAuth } from "@/context/auth-context";
+import { saveProject } from "@/lib/firebase/projects";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 
 export default function EditorPage() {
   const { selectedVideo } = useSelectedVideo();
+  const { user } = useAuth();
 
-  // Subtitle State
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle");
+
   const [subtitle, setSubtitle] = useState({
     text: "Exemplo de legenda do LKMOVIE01",
     language: "pt-BR",
@@ -18,7 +23,6 @@ export default function EditorPage() {
     position: "baixo",
   });
 
-  // Watermark State
   const [watermark, setWatermark] = useState({
     url: "",
     position: "canto-direito-baixo",
@@ -26,7 +30,6 @@ export default function EditorPage() {
     size: 120,
   });
 
-  // Final Logo State
   const [finalLogo, setFinalLogo] = useState({
     url: "",
     showPreview: false,
@@ -39,8 +42,50 @@ export default function EditorPage() {
   ) => {
     const file = e.target.files?.[0];
     if (file) {
-      const url = URL.createObjectURL(file);
-      setter((prev: any) => ({ ...prev, [field]: url }));
+      // Como o backend completo não está pronto, usaremos DataURL (Base64 Temporário) para persistir e renderizar
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setter((prev: any) => ({ ...prev, [field]: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSaveProject = async () => {
+    if (!user) {
+      alert("Você precisa estar logado para salvar o projeto.");
+      return;
+    }
+    if (!selectedVideo) return;
+
+    setIsSaving(true);
+    setSaveStatus("idle");
+
+    try {
+      await saveProject({
+        userId: user.uid,
+        videoId: selectedVideo.id,
+        title: selectedVideo.title,
+        thumbnail: selectedVideo.thumbnail,
+        channel: selectedVideo.channelTitle,
+        subtitleText: subtitle.text,
+        subtitleLanguage: subtitle.language,
+        subtitleColor: subtitle.color,
+        subtitleSize: subtitle.size,
+        subtitlePosition: subtitle.position,
+        watermarkUrl: watermark.url,
+        watermarkOpacity: watermark.opacity,
+        watermarkSize: watermark.size,
+        watermarkPosition: watermark.position,
+        endScreenUrl: finalLogo.url,
+      });
+      setSaveStatus("success");
+      setTimeout(() => setSaveStatus("idle"), 3000);
+    } catch (error) {
+      console.error(error);
+      setSaveStatus("error");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -66,7 +111,7 @@ export default function EditorPage() {
     switch (subtitle.size) {
       case "pequeno": return "text-sm md:text-xl";
       case "grande": return "text-3xl md:text-5xl border-2";
-      default: return "text-xl md:text-3xl"; // médio
+      default: return "text-xl md:text-3xl";
     }
   };
 
@@ -74,7 +119,7 @@ export default function EditorPage() {
     switch (subtitle.color) {
       case "amarelo": return "text-yellow-400";
       case "azul": return "text-blue-500";
-      default: return "text-white"; // branco
+      default: return "text-white";
     }
   };
 
@@ -90,7 +135,7 @@ export default function EditorPage() {
       case "canto-direito-topo": return "top-4 right-4";
       case "canto-esquerdo-baixo": return "bottom-4 left-4";
       case "centro": return "top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2";
-      default: return "bottom-4 right-4"; // canto-direito-baixo
+      default: return "bottom-4 right-4"; 
     }
   };
 
@@ -105,10 +150,8 @@ export default function EditorPage() {
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Lado Esquerdo - Preview (Ocupa 7 colunas) */}
         <div className="lg:col-span-7 space-y-4">
           <div className="aspect-video bg-black rounded-3xl border border-gray-800 overflow-hidden shadow-2xl relative group select-none">
-            {/* Imagem de Fundo (Thumbnail) */}
             <img 
               src={selectedVideo.thumbnail} 
               alt={selectedVideo.title} 
@@ -117,10 +160,8 @@ export default function EditorPage() {
 
             {!finalLogo.showPreview && (
               <>
-                {/* Overlay Escuro para dar contraste nas bordas */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20 pointer-events-none"></div>
 
-                {/* Marca D'água */}
                 {watermark.url && (
                   <img 
                     src={watermark.url} 
@@ -134,7 +175,6 @@ export default function EditorPage() {
                   />
                 )}
 
-                {/* Legenda */}
                 {subtitle.text && (
                   <div className={`absolute left-0 right-0 w-full flex justify-center px-8 transition-all duration-500 pointer-events-none ${getSubPositionClass()}`}>
                     <span 
@@ -148,7 +188,6 @@ export default function EditorPage() {
               </>
             )}
 
-            {/* Tela Final (Logo) */}
             {finalLogo.showPreview && (
                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm z-10 animate-in fade-in zoom-in duration-300">
                  {finalLogo.url ? (
@@ -169,7 +208,6 @@ export default function EditorPage() {
             )}
           </div>
 
-          {/* Info Bar */}
           <div className="flex justify-between items-center px-4 py-3 bg-gray-900 rounded-2xl border border-gray-800 shadow-lg">
              <div className="flex items-center gap-3 w-full pr-4">
                 <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
@@ -185,11 +223,9 @@ export default function EditorPage() {
           </div>
         </div>
 
-        {/* Lado Direito - Controles (Ocupa 5 colunas) */}
         <div className="lg:col-span-5 space-y-6">
           <div className="bg-gray-900/80 backdrop-blur-xl border border-gray-800 p-6 rounded-3xl shadow-2xl max-h-[75vh] overflow-y-auto custom-scrollbar relative">
             
-            {/* Seção de Legenda */}
             <div className="space-y-5 mb-10">
               <div className="flex items-center justify-between border-b border-gray-800 pb-3">
                 <div className="flex items-center gap-3">
@@ -260,7 +296,6 @@ export default function EditorPage() {
               </div>
             </div>
 
-            {/* Seção Marca D'água */}
             <div className="space-y-5 mb-10">
               <div className="flex items-center justify-between border-b border-gray-800 pb-3">
                 <div className="flex items-center gap-3">
@@ -331,7 +366,6 @@ export default function EditorPage() {
               </div>
             </div>
 
-            {/* Seção Logo Final */}
             <div className="space-y-5 mb-10">
               <div className="flex items-center justify-between border-b border-gray-800 pb-3">
                 <div className="flex items-center gap-3">
@@ -373,13 +407,27 @@ export default function EditorPage() {
               </div>
             </div>
 
-            {/* Ações Fixas no Rodapé */}
             <div className="sticky bottom-0 bg-gray-900/95 backdrop-blur-md pt-4 pb-2 border-t border-gray-800 mt-6 z-20">
+               {saveStatus === "success" && (
+                 <div className="mb-4 text-center text-sm text-green-400 font-medium bg-green-500/10 py-2 rounded-lg border border-green-500/20">
+                    Projeto salvo com sucesso na biblioteca!
+                 </div>
+               )}
+               {saveStatus === "error" && (
+                 <div className="mb-4 text-center text-sm text-red-400 font-medium bg-red-500/10 py-2 rounded-lg border border-red-500/20">
+                    Erro ao salvar o projeto.
+                 </div>
+               )}
                <Button 
-                onClick={() => alert("Simulação concluída! (Este é apenas um protótipo visual)")}
-                className="w-full bg-blue-600 hover:bg-blue-500 text-white py-7 rounded-2xl font-bold text-lg shadow-[0_0_40px_rgba(59,130,246,0.3)] transition-all transform hover:scale-[1.01] active:scale-100 flex items-center justify-center gap-2 group"
+                onClick={handleSaveProject}
+                disabled={isSaving}
+                className="w-full bg-blue-600 hover:bg-blue-500 text-white py-7 rounded-2xl font-bold text-lg shadow-[0_0_40px_rgba(59,130,246,0.3)] transition-all transform hover:scale-[1.01] active:scale-100 disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2 group"
                >
-                  <span>🪄</span> <span className="group-hover:tracking-wide transition-all">Gerar vídeo (simulação)</span>
+                  {isSaving ? (
+                     <span className="animate-spin">⏳</span>
+                  ) : (
+                     <><span>💾</span> <span className="group-hover:tracking-wide transition-all">Salvar projeto</span></>
+                  )}
                </Button>
             </div>
 
