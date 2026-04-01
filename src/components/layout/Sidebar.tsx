@@ -1,17 +1,22 @@
 "use client";
 
+import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLayout } from "@/context/layout-context";
 import { signOutUser } from "@/lib/firebase/auth";
 import { useAuth } from "@/context/auth-context";
 import { useBranding } from "@/context/branding-context";
+import { useTheme } from "@/context/theme-context";
 
 export function Sidebar() {
   const pathname = usePathname();
   const { sidebarCollapsed, setSidebarCollapsed } = useLayout();
   const { branding } = useBranding();
   const { user } = useAuth();
+  const { theme, setTheme } = useTheme();
+
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const navItems = [
     { label: "Dashboard", href: "/dashboard", icon: "📊" },
@@ -30,14 +35,14 @@ export function Sidebar() {
 
   return (
     <aside 
-      className={`fixed top-0 left-0 h-full bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 transition-all duration-300 flex flex-col z-50 ${
-        sidebarCollapsed ? "w-20" : "w-64"
+      className={`fixed top-0 left-0 h-full bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 transition-all duration-300 flex flex-col z-50 shadow-xl dark:shadow-none ${
+        sidebarCollapsed ? "w-20" : "w-72"
       }`}
     >
       {/* Toggle Button */}
       <button 
         onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-        className="absolute -right-3 top-10 bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center hover:bg-blue-500 transition-all shadow-lg active:scale-90"
+        className="absolute -right-3 top-8 bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center hover:bg-blue-500 transition-all shadow-lg active:scale-90 z-10"
       >
         <span className={`text-[10px] transform transition-transform duration-300 ${sidebarCollapsed ? "rotate-180" : ""}`}>
           ◀
@@ -45,34 +50,36 @@ export function Sidebar() {
       </button>
 
       {/* Header */}
-      <div className={`p-6 transition-all duration-300 ${sidebarCollapsed ? "opacity-0 invisible h-0 overflow-hidden" : "opacity-100 visible h-auto"}`}>
-        <h2 className="text-xl font-bold text-blue-600 whitespace-nowrap flex items-center gap-2">
-          <span className="text-2xl">{branding.logo}</span>
-          {branding.appName}
+      <div className={`p-6 transition-all duration-300 ${sidebarCollapsed ? "opacity-0 invisible h-0 overflow-hidden p-0" : "opacity-100 visible h-auto"}`}>
+        <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-500 whitespace-nowrap flex items-center gap-3">
+          <span className="text-3xl filter drop-shadow-md">{branding.logo}</span>
+          <span className="tracking-tight">{branding.appName}</span>
         </h2>
       </div>
       
-      <div className={`p-6 transition-all duration-300 flex justify-center ${sidebarCollapsed ? "opacity-100 visible" : "opacity-0 invisible h-0 overflow-hidden"}`}>
-         <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white text-xl shadow-lg shadow-blue-600/20">
+      <div className={`p-6 transition-all duration-300 flex justify-center ${sidebarCollapsed ? "opacity-100 visible" : "opacity-0 invisible h-0 overflow-hidden p-0"}`}>
+         <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white text-2xl shadow-xl shadow-blue-600/30">
            {branding.logo}
          </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 space-y-2 mt-4">
+      <nav className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto custom-scrollbar">
+        <div className={`text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 ml-2 transition-opacity ${sidebarCollapsed ? 'opacity-0' : 'opacity-100'}`}>Menu Principal</div>
         {navItems.map((item) => {
           const isActive = pathname === item.href;
           return (
             <Link 
               key={item.href}
               href={item.href} 
-              className={`flex items-center gap-4 px-4 py-3 rounded-2xl transition-all duration-300 overflow-hidden whitespace-nowrap ${
+              className={`flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all duration-300 overflow-hidden whitespace-nowrap group relative ${
                 isActive 
-                  ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 font-bold" 
-                  : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
+                  ? "bg-blue-50 dark:bg-blue-600/10 text-blue-600 dark:text-blue-400 font-bold" 
+                  : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
               }`}
             >
-              <span className="text-xl shrink-0">{item.icon}</span>
+              {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-blue-600 rounded-r-full"></div>}
+              <span className={`text-xl shrink-0 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>{item.icon}</span>
               <span className={`transition-opacity duration-300 ${sidebarCollapsed ? "opacity-0" : "opacity-100"}`}>
                 {item.label}
               </span>
@@ -81,34 +88,54 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Footer / User Profile */}
-      <div className="p-4 border-t border-gray-100 dark:border-gray-800 space-y-4">
-        <Link 
-           href="/perfil" 
-           className={`flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-all overflow-hidden ${
-             sidebarCollapsed ? "justify-center" : ""
+      {/* Footer / User Profile Menu */}
+      <div className="p-4 relative">
+         {/* Dropdown Superior */}
+         {isMenuOpen && !sidebarCollapsed && (
+            <div className="absolute bottom-[80px] left-4 right-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-2xl p-2 animate-in fade-in slide-in-from-bottom-2 duration-200 z-50">
+               <Link href="/perfil" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-3 w-full px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700/50 rounded-xl transition-colors text-sm font-medium text-gray-700 dark:text-gray-200">
+                 <span className="text-lg">👤</span> Meu Perfil
+               </Link>
+               <Link href="/configuracoes" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-3 w-full px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700/50 rounded-xl transition-colors text-sm font-medium text-gray-700 dark:text-gray-200">
+                 <span className="text-lg">⚙️</span> Configurações
+               </Link>
+               <div className="my-2 border-t border-gray-200 dark:border-gray-700"></div>
+               <div className="px-4 py-2 flex items-center justify-between">
+                 <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">Tema</span>
+                 <div className="flex bg-gray-100 dark:bg-gray-900 rounded-lg p-1">
+                   <button onClick={() => setTheme("light")} className={`p-1.5 rounded-md text-xs ${theme === 'light' ? 'bg-white shadow dark:bg-gray-700 text-yellow-500' : 'text-gray-400'}`}>☀️</button>
+                   <button onClick={() => setTheme("dark")} className={`p-1.5 rounded-md text-xs ${theme === 'dark' ? 'bg-white shadow dark:bg-gray-700 text-blue-400' : 'text-gray-400'}`}>🌙</button>
+                   <button onClick={() => setTheme("system")} className={`p-1.5 rounded-md text-xs ${theme === 'system' ? 'bg-white shadow dark:bg-gray-700 text-gray-800 dark:text-gray-200' : 'text-gray-400'}`}>💻</button>
+                 </div>
+               </div>
+               <div className="my-2 border-t border-gray-200 dark:border-gray-700"></div>
+               <button onClick={handleLogout} className="flex items-center gap-3 w-full px-4 py-3 hover:bg-red-50 dark:hover:bg-red-900/10 text-red-500 rounded-xl transition-colors text-sm font-bold">
+                 <span className="text-lg">🚪</span> Sair da conta
+               </button>
+            </div>
+         )}
+
+        <div 
+           onClick={() => !sidebarCollapsed && setIsMenuOpen(!isMenuOpen)}
+           className={`flex items-center gap-3 p-3 rounded-2xl hover:bg-gray-50 dark:bg-gray-800/50 dark:hover:bg-gray-800 transition-all cursor-pointer border border-transparent dark:border-gray-700 ${
+             sidebarCollapsed ? "justify-center" : "shadow-sm"
            }`}
         >
-          <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold shrink-0 border-2 border-white dark:border-gray-800 shadow-sm">
+          <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-blue-600 to-purple-600 flex items-center justify-center text-white font-bold shrink-0 border-2 border-white dark:border-gray-900 shadow-md">
             {user?.email?.[0].toUpperCase() || "U"}
           </div>
-          <div className={`transition-opacity duration-300 overflow-hidden ${sidebarCollapsed ? "opacity-0 w-0" : "opacity-100"}`}>
-            <p className="text-xs font-bold text-gray-700 dark:text-white truncate max-w-[120px]">
-              {user?.email?.split('@')[0] || "Usuário"}
+          <div className={`transition-opacity duration-300 overflow-hidden flex-1 ${sidebarCollapsed ? "opacity-0 w-0" : "opacity-100"}`}>
+            <p className="text-sm font-bold text-gray-800 dark:text-white truncate">
+              {user?.email?.split('@')[0] || "Usuário LK"}
             </p>
-            <p className="text-[10px] text-gray-400 truncate max-w-[120px]">{user?.email}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 truncate font-medium">{user?.email}</p>
           </div>
-        </Link>
-        
-        <button 
-          onClick={handleLogout}
-          className={`w-full flex items-center gap-4 px-4 py-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-2xl transition-all overflow-hidden font-bold text-sm ${
-            sidebarCollapsed ? "justify-center" : ""
-          }`}
-        >
-           <span className="text-lg shrink-0">🚪</span>
-           <span className={`transition-opacity duration-300 ${sidebarCollapsed ? "opacity-0 w-0" : "opacity-100"}`}>Sair</span>
-        </button>
+          {!sidebarCollapsed && (
+             <div className="text-gray-400 text-xs">
+                {isMenuOpen ? "▼" : "▲"}
+             </div>
+          )}
+        </div>
       </div>
     </aside>
   );

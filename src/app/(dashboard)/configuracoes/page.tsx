@@ -1,112 +1,187 @@
 "use client";
 
-import React from "react";
-import { useTheme } from "@/context/theme-context";
+import React, { useState } from "react";
 import { useBranding } from "@/context/branding-context";
+import { useTheme } from "@/context/theme-context";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 
-export default function SettingsPage() {
-  const { theme, setTheme } = useTheme();
+export default function ConfiguracoesPage() {
   const { branding, setBranding } = useBranding();
+  const { theme, setTheme } = useTheme();
+  const [activeTab, setActiveTab] = useState("aparencia");
 
-  const themes = [
-    { id: "light", label: "☀️ Claro" },
-    { id: "dark", label: "🌙 Escuro" },
-    { id: "system", label: "💻 Sistema" }
-  ];
+  const [localBranding, setLocalBranding] = useState(branding);
+
+  const handleSaveBranding = () => {
+    setBranding(localBranding);
+    alert("Configurações salvas com sucesso!");
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLocalBranding(prev => ({ ...prev, [field]: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-10 animate-in fade-in slide-in-from-right-10 duration-700 pb-20">
+    <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
       <header className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold dark:text-white mb-2">Configurações Gerais</h1>
-        <p className="text-gray-500 dark:text-gray-400">Configure os padrões para seus futuros projetos e o visual da ferramenta.</p>
+        <h1 className="text-4xl font-black text-gray-900 dark:text-white tracking-tight">Configurações</h1>
+        <p className="text-gray-500 dark:text-gray-400 font-medium">Personalize sua experiência visual, sistema e conta.</p>
       </header>
 
-      <div className="space-y-12 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-8 rounded-3xl shadow-xl">
-        {/* Appearance Section */}
-        <section className="space-y-6">
-          <div className="flex items-center gap-3 mb-2">
-            <span className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-sm font-bold text-white shadow-lg">T</span>
-            <h2 className="text-xl font-semibold dark:text-white">Aparência do CRM</h2>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {themes.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setTheme(t.id as any)}
-                className={`flex flex-col items-center justify-center py-8 rounded-2xl border text-sm font-bold transition-all relative ${
-                  theme === t.id 
-                    ? "bg-blue-600 border-blue-500 text-white shadow-xl scale-[1.02] z-10" 
-                    : "bg-gray-50 dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-500 hover:scale-[1.02] hover:bg-white dark:hover:bg-gray-700"
-                }`}
-              >
-                <span className="text-3xl mb-2">{t.label.split(' ')[0]}</span>
-                <span className="mb-0.5">{t.label.split(' ')[1]}</span>
-                {theme === t.id && (
-                  <div className="absolute top-2 right-2 w-2 h-2 bg-white rounded-full animate-pulse"></div>
-                )}
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <hr className="border-gray-100 dark:border-gray-800" />
-
-        {/* Branding Section */}
-        <section className="space-y-6">
-          <div className="flex items-center gap-3 mb-2">
-            <span className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-sm font-bold text-white shadow-lg">B</span>
-            <h2 className="text-xl font-semibold dark:text-white">Identidade Visual</h2>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Nome da Aplicação</label>
-              <input 
-                value={branding.appName}
-                onChange={(e) => setBranding({ appName: e.target.value })}
-                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 dark:text-white outline-none transition-all"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Logo / Emoji</label>
-              <input 
-                value={branding.logo}
-                onChange={(e) => setBranding({ logo: e.target.value })}
-                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 dark:text-white outline-none transition-all"
-              />
-            </div>
-          </div>
-        </section>
-
-        <hr className="border-gray-100 dark:border-gray-800" />
-
-        {/* Security & Preferences Section Placeholder */}
-        <section className="space-y-6 opacity-30 pointer-events-none grayscale">
-           <div className="flex items-center gap-3 mb-2">
-            <span className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-sm font-bold text-white shadow-lg">S</span>
-            <h2 className="text-xl font-semibold dark:text-white">Preferências de Conta</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-             <div className="p-6 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
-               <p className="text-xs font-bold text-gray-400 mb-2">Notificações por Email</p>
-               <div className="w-12 h-6 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
-             </div>
-             <div className="p-6 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
-               <p className="text-xs font-bold text-gray-400 mb-2">Login em duas etapas</p>
-               <div className="w-12 h-6 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
-             </div>
-          </div>
-          <p className="text-[10px] uppercase tracking-widest font-bold text-blue-600 text-center animate-pulse">Breve: Novas Configurações</p>
-        </section>
-
-        <div className="flex justify-end pt-6">
+      <div className="flex gap-8 flex-col lg:flex-row">
+        {/* Menu Lateral das Configurações */}
+        <div className="lg:w-64 space-y-2 flex-shrink-0">
           <button 
-            disabled 
-            className="bg-gray-200 dark:bg-gray-800 text-gray-400 px-10 py-5 text-base font-bold rounded-2xl transition-all cursor-not-allowed"
+            onClick={() => setActiveTab("aparencia")} 
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'aparencia' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
           >
-            Configurações salvas automaticamente
+            🎨 Aparência
           </button>
+          <button 
+            onClick={() => setActiveTab("branding")} 
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'branding' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+          >
+            🏢 Branding (Selo)
+          </button>
+          <button 
+            onClick={() => setActiveTab("conta")} 
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'conta' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+          >
+            👤 Conta
+          </button>
+        </div>
+
+        {/* Área de Conteúdo */}
+        <div className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-8 shadow-2xl dark:shadow-none min-h-[500px]">
+          
+          {/* Aba APARÊNCIA */}
+          {activeTab === "aparencia" && (
+            <div className="space-y-8 animate-in fade-in">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Tema do Sistema</h2>
+                <p className="text-gray-500 text-sm mb-6">Escolha o esquema de cores que melhor se adapta aos seus olhos.</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div 
+                    onClick={() => setTheme("light")}
+                    className={`cursor-pointer rounded-2xl border-2 p-1 transition-all ${theme === 'light' ? 'border-blue-600 shadow-blue-600/20 shadow-lg' : 'border-gray-200 dark:border-gray-800 hover:border-gray-400'}`}
+                  >
+                     <div className="bg-gray-100 h-32 rounded-xl flex items-center justify-center text-4xl">☀️</div>
+                     <p className="text-center font-bold text-gray-800 dark:text-white py-3">Claro</p>
+                  </div>
+                  <div 
+                    onClick={() => setTheme("dark")}
+                    className={`cursor-pointer rounded-2xl border-2 p-1 transition-all ${theme === 'dark' ? 'border-blue-600 shadow-blue-600/20 shadow-lg' : 'border-gray-200 dark:border-gray-800 hover:border-gray-400'}`}
+                  >
+                     <div className="bg-gray-900 h-32 rounded-xl flex items-center justify-center text-4xl">🌙</div>
+                     <p className="text-center font-bold text-gray-800 dark:text-white py-3">Escuro</p>
+                  </div>
+                  <div 
+                    onClick={() => setTheme("system")}
+                    className={`cursor-pointer rounded-2xl border-2 p-1 transition-all ${theme === 'system' ? 'border-blue-600 shadow-blue-600/20 shadow-lg' : 'border-gray-200 dark:border-gray-800 hover:border-gray-400'}`}
+                  >
+                     <div className="bg-gradient-to-br from-gray-100 to-gray-900 h-32 rounded-xl flex items-center justify-center text-4xl">💻</div>
+                     <p className="text-center font-bold text-gray-800 dark:text-white py-3">Sistema</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Aba BRANDING */}
+          {activeTab === "branding" && (
+            <div className="space-y-8 animate-in fade-in">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Identidade Visual</h2>
+                <p className="text-gray-500 text-sm mb-6">Configure o nome e logo padrão da sua infraestrutura.</p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Nome do Aplicativo</label>
+                    <Input 
+                      value={localBranding.appName} 
+                      onChange={(e) => setLocalBranding({...localBranding, appName: e.target.value})}
+                      className="bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 h-12 text-lg text-gray-900 dark:text-white"
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Emoji/Ícone</label>
+                    <Input 
+                      value={localBranding.logo} 
+                      onChange={(e) => setLocalBranding({...localBranding, logo: e.target.value})}
+                      className="bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 h-12 text-lg text-gray-900 dark:text-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-8 space-y-6">
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-800 pb-2">Assinaturas Padrão do Editor</h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                     <div className="space-y-3">
+                       <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Marca d'água Global (PNG)</label>
+                       <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 rounded-2xl cursor-pointer bg-gray-50 dark:bg-gray-800/50 transition-colors">
+                          {localBranding.defaultWatermark ? (
+                             <img src={localBranding.defaultWatermark} className="h-20 object-contain" />
+                          ) : (
+                             <>
+                               <span className="text-2xl mb-2 opacity-50">💧</span>
+                               <span className="text-sm font-medium text-gray-500">Selecionar Selo</span>
+                             </>
+                          )}
+                          <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e, "defaultWatermark")} />
+                       </label>
+                     </div>
+
+                     <div className="space-y-3">
+                       <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Tela Final Padrão</label>
+                       <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 rounded-2xl cursor-pointer bg-gray-50 dark:bg-gray-800/50 transition-colors">
+                          {localBranding.defaultEndScreen ? (
+                             <img src={localBranding.defaultEndScreen} className="h-20 object-contain" />
+                          ) : (
+                             <>
+                               <span className="text-2xl mb-2 opacity-50">🏁</span>
+                               <span className="text-sm font-medium text-gray-500">Selecionar Tela Final</span>
+                             </>
+                          )}
+                          <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e, "defaultEndScreen")} />
+                       </label>
+                     </div>
+                  </div>
+                </div>
+
+                <div className="mt-8 flex justify-end">
+                  <Button onClick={handleSaveBranding} className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-8 py-6 rounded-xl text-lg shadow-lg shadow-blue-600/30 transition-transform active:scale-95">
+                    Salvar Branding
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Aba CONTA */}
+          {activeTab === "conta" && (
+            <div className="space-y-8 animate-in fade-in flex flex-col items-center justify-center text-center py-10">
+               <div className="w-24 h-24 rounded-full bg-blue-600/10 text-blue-600 flex items-center justify-center text-5xl mb-4 border-4 border-blue-600/20">
+                 👤
+               </div>
+               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Gerenciamento de Conta</h2>
+               <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">Para alterar sua senha ou informações de e-mail, por favor acesse a página de perfil completa.</p>
+               <Link href="/perfil">
+                 <Button className="mt-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-bold px-8 py-6 rounded-xl hover:bg-gray-800 dark:hover:bg-gray-100">
+                   Ir para Meu Perfil
+                 </Button>
+               </Link>
+            </div>
+          )}
+
         </div>
       </div>
     </div>

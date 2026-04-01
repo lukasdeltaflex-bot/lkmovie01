@@ -1,12 +1,14 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
-interface Branding {
+export interface Branding {
   appName: string;
   logo: string;
   primaryColor: string;
   secondaryColor: string;
+  defaultWatermark: string;
+  defaultEndScreen: string;
 }
 
 interface BrandingContextType {
@@ -19,12 +21,33 @@ const defaultBranding: Branding = {
   logo: "🎬",
   primaryColor: "#2563eb", // blue-600
   secondaryColor: "#4f46e5", // indigo-600
+  defaultWatermark: "",
+  defaultEndScreen: "",
 };
 
 const BrandingContext = createContext<BrandingContextType | undefined>(undefined);
 
 export function BrandingProvider({ children }: { children: ReactNode }) {
   const [branding, setBrandingState] = useState<Branding>(defaultBranding);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const saved = localStorage.getItem("branding_config");
+    if (saved) {
+      try {
+        setBrandingState(JSON.parse(saved));
+      } catch (e) {
+        console.error("Erro ao dar parse no branding", e);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (mounted) {
+      localStorage.setItem("branding_config", JSON.stringify(branding));
+    }
+  }, [branding, mounted]);
 
   const setBranding = (newBranding: Partial<Branding>) => {
     setBrandingState((prev) => ({ ...prev, ...newBranding }));
