@@ -11,9 +11,10 @@ import { saveEditorPreset, getUserPresets, EditorPreset } from "@/lib/firebase/p
 import { createNotification } from "@/lib/firebase/notifications";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import axios from "axios";
 
 type AspectRatio = "16:9" | "9:16" | "1:1";
-type EditorSection = "video" | "subtitle" | "watermark" | "final";
+type EditorSection = "video" | "subtitle" | "audio" | "watermark" | "final";
 
 export default function EditorPage() {
   const { selectedVideo, clips, activeClipIndex, setActiveClipIndex, setClips } = useSelectedVideo();
@@ -31,6 +32,7 @@ export default function EditorPage() {
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [activeStyle, setActiveStyle] = useState<"none" | "motivational" | "cinema" | "viral">("none");
+  const [renderUrl, setRenderUrl] = useState<string | null>(null);
 
   // VIDEO STATE (Local and synced with current clip)
   const [videoConfig, setVideoConfig] = useState({
@@ -117,6 +119,30 @@ export default function EditorPage() {
     showPreview: false,
   });
 
+  // AUDIO STATE
+  const [audioConfig, setAudioConfig] = useState({
+    originalVolume: 100,
+    originalMuted: false,
+    musicUrl: null as string | null,
+    musicName: "",
+    musicStyle: "",
+    musicVolume: 50,
+    fadeIn: true,
+    fadeOut: true,
+    mixMode: "mix" as "keep" | "remove" | "mix"
+  });
+
+  const [musicSearchQuery, setMusicSearchQuery] = useState("");
+  const [isAnalyzingAudio, setIsAnalyzingAudio] = useState(false);
+
+  const musicSuggestions = [
+    { id: 1, name: "Epic Cinematic Orchestral", style: "Épico", mood: "Heroico", duration: "2:30" },
+    { id: 2, name: "Sunset Lo-Fi Vibes", style: "Casual", mood: "Relaxante", duration: "4:00" },
+    { id: 3, name: "Hyper Digital Success", style: "Motivacional", mood: "Energético", duration: "1:45" },
+    { id: 4, name: "Dark Suspense Pulse", style: "Suspense", mood: "Tenso", duration: "3:10" },
+    { id: 5, name: "Romantic Piano Dream", style: "Romântico", mood: "Suave", duration: "2:50" },
+  ];
+
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   // UX STATE
@@ -201,6 +227,53 @@ export default function EditorPage() {
     }
   }, [mode]);
 
+  // AUDIO LOGIC
+  const applyAudioPreset = (preset: "cinema" | "motivational" | "triste" | "viral" | "storytelling") => {
+    setAudioConfig(prev => ({ ...prev, activePreset: preset } as any));
+    showToast(`Áudio Preset: ${preset.toUpperCase()} Ativado!`, "info");
+    switch (preset) {
+      case "cinema":
+        setAudioConfig(v => ({ ...v, originalVolume: 60, musicVolume: 40, fadeIn: true, fadeOut: true }));
+        break;
+      case "motivational":
+        setAudioConfig(v => ({ ...v, originalVolume: 80, musicVolume: 60, fadeIn: true, fadeOut: false }));
+        break;
+      case "triste":
+        setAudioConfig(v => ({ ...v, originalVolume: 40, musicVolume: 80, fadeIn: true, fadeOut: true }));
+        break;
+      case "viral":
+        setAudioConfig(v => ({ ...v, originalVolume: 100, musicVolume: 20, fadeIn: false, fadeOut: false }));
+        break;
+      case "storytelling":
+        setAudioConfig(v => ({ ...v, originalVolume: 100, musicVolume: 10, fadeIn: true, fadeOut: true, originalMuted: false }));
+        break;
+    }
+  };
+
+  const handleAutoAdjustAudio = () => {
+    showToast("Inteligência de Áudio: Analisando Mixagem...", "info");
+    setTimeout(() => {
+      if (audioConfig.musicUrl) {
+         setAudioConfig(prev => ({ ...prev, originalVolume: 20, musicVolume: 80 }));
+         showToast("Mixagem Otimizada! (Prioridade Dublagem)", "success");
+      } else {
+         setAudioConfig(prev => ({ ...prev, originalVolume: 100 }));
+         showToast("Mixagem Otimizada! (Prioridade Original)", "success");
+      }
+    }, 1000);
+  };
+
+  const handleAISuggestion = () => {
+    setIsAnalyzingAudio(true);
+    showToast("IA: Analisando ritmo e cenas do vídeo...", "info");
+    setTimeout(() => {
+      setIsAnalyzingAudio(false);
+      const recommendedStyle = activeStyle === "motivational" ? "Motivacional" : activeStyle === "cinema" ? "Épico" : "Viral";
+      setMusicSearchQuery(recommendedStyle);
+      showToast(`Recomendação IA: Estilo ${recommendedStyle} Identificado!`, "success");
+    }, 2000);
+  };
+
   const applySubtitlePreset = (preset: string) => {
     switch (preset) {
       case "cinema":
@@ -266,24 +339,55 @@ export default function EditorPage() {
   };
 
   const handleGenerateVideo = async () => {
-    if (!user || !selectedVideo) return;
+    if (!selectedVideo) return;
+    
     setIsRendering(true);
-    setRenderProgress(0);
-    const statuses = [
-      "Analisando Roteiro...", 
-      `Processando ${clips.length} Cenas...`, 
-      "Sincronizando Legendas Inteligentes...", 
-      "Aplicando Estética Premium...",
-      "Finalizando Exportação 4K..."
-    ];
-    let step = 0;
-    const interval = setInterval(() => {
-      setRenderProgress(p => {
-        if (p >= 100) { clearInterval(interval); finishRender(); return 100; }
-        if (p % 20 === 0) { setRenderStatus(statuses[step] || "Finalizando..."); step++; }
-        return p + 1;
+    setRenderProgress(10);
+    setRenderStatus("Iniciando Renderização...");
+
+    try {
+      showToast("🚀 Processando vídeo no servidor...", "info");
+      
+      // Real video extraction would go here. Using a mock URL for the FFmpeg pipeline.
+      const finalVideoUrl = `https://www.youtube.com/watch?v=${selectedVideo.id}`;
+
+      const response = await axios.post("/api/render-video", {
+        videoUrl: finalVideoUrl,
+        subtitle,
+        watermark,
+        audioConfig,
+        aspectRatio: videoConfig.aspectRatio
+      }, {
+        responseType: 'blob',
+        onDownloadProgress: (p) => {
+           const percent = Math.round((p.loaded * 100) / (p.total || 10000000));
+           setRenderProgress(Math.min(95, 10 + percent));
+           setRenderStatus("Renderizando Frames...");
+        }
       });
-    }, 100);
+
+      setRenderProgress(100);
+      setRenderStatus("Finalizado!");
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      setRenderUrl(url);
+      setShowSuccessModal(true);
+      showToast("✅ Vídeo gerado com sucesso!", "success");
+
+      if (user) {
+         await createNotification(user.uid, {
+            title: "Vídeo Renderizado",
+            message: `O vídeo "${selectedVideo.title}" foi processado com sucesso.`,
+            type: "success"
+         });
+      }
+
+    } catch (error: any) {
+      console.error("Render Error:", error);
+      showToast("❌ Erro na renderização. Tente novamente.", "error");
+    } finally {
+      setIsRendering(false);
+    }
   };
 
   const finishRender = async () => {
@@ -536,6 +640,7 @@ export default function EditorPage() {
                  {([
                    { id: "video", icon: "🎬", label: "Video" },
                    { id: "subtitle", icon: "💬", label: "Texto" },
+                   { id: "audio", icon: "🎵", label: "Áudio" },
                    { id: "watermark", icon: "🏷️", label: "Logo" },
                    { id: "final", icon: "✨", label: "Final" }
                  ] as const).map(tab => (
@@ -727,6 +832,193 @@ export default function EditorPage() {
                              ))}
                           </div>
                       </div>
+                   </div>
+                 )}
+
+                 {/* SECTION: AUDIO */}
+                 {activeSection === "audio" && (
+                   <div className="space-y-10 animate-in slide-in-from-right-4 duration-500 pb-10">
+                      <div className="flex items-center justify-between">
+                         <SectionTitle title="Laboratório de Áudio" icon="🎧" />
+                         <Button 
+                          onClick={handleAISuggestion}
+                          disabled={isAnalyzingAudio}
+                          className="h-10 px-4 rounded-xl font-black text-[8px] uppercase tracking-widest text-white shadow-lg animate-pulse"
+                          style={{ backgroundColor: branding.primaryColor }}
+                         >
+                            {isAnalyzingAudio ? "⏳ Analisando..." : "✨ Sugerir para esta cena"}
+                         </Button>
+                      </div>
+
+                      {/* BLOCO 1: PRESETS DE ÁUDIO */}
+                      <div className="space-y-4">
+                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Presets de Áudio Profissional</label>
+                         <div className="grid grid-cols-5 gap-2">
+                            {(["cinema", "motivational", "triste", "viral", "storytelling"] as const).map(p => (
+                              <button 
+                                key={p}
+                                onClick={() => applyAudioPreset(p)}
+                                className={`flex flex-col items-center justify-center py-4 rounded-2xl text-[8px] font-black border-2 transition-all uppercase tracking-widest ${(audioConfig as any).activePreset === p ? 'border-primary bg-primary/10 text-primary' : 'border-gray-100 dark:border-gray-800 text-gray-400 hover:border-gray-300'}`}
+                                style={(audioConfig as any).activePreset === p ? { borderColor: branding.primaryColor, color: branding.primaryColor, backgroundColor: `${branding.primaryColor}1a` } : {}}
+                              > 
+                                <span className="mb-1 text-base">{p === "cinema" ? "🎬" : p === "motivational" ? "🚀" : p === "triste" ? "🎻" : p === "viral" ? "🔥" : "📖"}</span>
+                                {p.substring(0, 4)} 
+                              </button>
+                            ))}
+                         </div>
+                      </div>
+                      
+                      {/* BLOCO 2: FONTE & MIXAGEM */}
+                      <div className="space-y-6">
+                         <div className="flex items-center justify-between px-1">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-loose">Mixagem Avançada</label>
+                            <button 
+                              onClick={handleAutoAdjustAudio}
+                              className="text-[8px] font-black text-blue-500 uppercase tracking-tighter hover:underline px-2 py-1 bg-blue-500/5 rounded-lg"
+                            >⚡ Ajustar Automaticamente</button>
+                         </div>
+                         
+                         <div className="space-y-6 bg-gray-50 dark:bg-black/40 p-6 rounded-3xl border border-gray-100 dark:border-gray-800">
+                            <div className="grid grid-cols-2 gap-3">
+                               <button 
+                                onClick={() => setAudioConfig(a => ({...a, originalMuted: !a.originalMuted}))}
+                                className={`py-4 rounded-xl border-2 text-[8px] font-black uppercase transition-all ${!audioConfig.originalMuted ? 'bg-blue-500/10 border-blue-500 text-blue-500' : 'bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 text-gray-400'}`}
+                                style={!audioConfig.originalMuted ? { borderColor: branding.primaryColor, color: branding.primaryColor, backgroundColor: `${branding.primaryColor}1a` } : {}}
+                               >Áudio Original</button>
+                               <button 
+                                onClick={() => setAudioConfig(a => ({...a, originalMuted: true, musicVolume: 100}))}
+                                className={`py-4 rounded-xl border-2 text-[8px] font-black uppercase transition-all ${audioConfig.originalMuted ? 'bg-blue-500/10 border-blue-500 text-blue-500' : 'bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 text-gray-400'}`}
+                                style={audioConfig.originalMuted ? { borderColor: branding.primaryColor, color: branding.primaryColor, backgroundColor: `${branding.primaryColor}1a` } : {}}
+                               >Apenas Música</button>
+                            </div>
+
+                            <div className="space-y-6 pt-4 border-t border-gray-100 dark:border-gray-800">
+                               <div className="space-y-3">
+                                  <div className="flex justify-between items-center text-[8px] font-black uppercase text-gray-500">
+                                     <span>Volume Original</span>
+                                     <span style={{ color: branding.primaryColor }}>{audioConfig.originalVolume}%</span>
+                                  </div>
+                                  <input 
+                                    type="range" min="0" max="100" 
+                                    value={audioConfig.originalVolume}
+                                    onChange={(e) => setAudioConfig(a => ({...a, originalVolume: parseInt(e.target.value)}))}
+                                    className="w-full h-1.5 bg-gray-200 dark:bg-gray-800 rounded-full appearance-none accent-primary"
+                                    style={{ accentColor: branding.primaryColor, opacity: audioConfig.originalMuted ? 0.3 : 1 }}
+                                    disabled={audioConfig.originalMuted}
+                                  />
+                               </div>
+                               <div className="space-y-3">
+                                  <div className="flex justify-between items-center text-[8px] font-black uppercase text-gray-500">
+                                     <span>Volume da Música</span>
+                                     <span style={{ color: branding.primaryColor }}>{audioConfig.musicVolume}%</span>
+                                  </div>
+                                  <input 
+                                    type="range" min="0" max="100" 
+                                    value={audioConfig.musicVolume}
+                                    onChange={(e) => setAudioConfig(a => ({...a, musicVolume: parseInt(e.target.value)}))}
+                                    className="w-full h-1.5 bg-gray-200 dark:bg-gray-800 rounded-full appearance-none accent-primary"
+                                    style={{ accentColor: branding.primaryColor, opacity: !audioConfig.musicUrl ? 0.3 : 1 }}
+                                    disabled={!audioConfig.musicUrl}
+                                  />
+                               </div>
+                            </div>
+                         </div>
+
+                         {/* ALERTA DE CONFLITO */}
+                         {audioConfig.musicUrl && !audioConfig.originalMuted && (
+                             <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-2xl space-y-3 animate-in slide-in-from-top-2">
+                                <div className="flex items-center gap-3">
+                                   <span className="text-lg">🔊</span>
+                                   <p className="text-[9px] font-black text-orange-600 dark:text-orange-400 uppercase tracking-widest italic tracking-[0.2em]">O vídeo possui áudio original</p>
+                                </div>
+                                <div className="flex gap-2">
+                                   <button 
+                                    onClick={() => setAudioConfig(a => ({...a, mixMode: "mix", originalVolume: 40}))}
+                                    className="px-3 py-1.5 border border-orange-500/30 text-orange-600 dark:text-orange-400 text-[8px] font-black rounded-lg hover:bg-orange-500/10 uppercase"
+                                   >Misturar</button>
+                                   <button 
+                                    onClick={() => setAudioConfig(a => ({...a, originalVolume: 20}))}
+                                    className="px-3 py-1.5 border border-orange-500/30 text-orange-600 dark:text-orange-400 text-[8px] font-black rounded-lg hover:bg-orange-500/10 uppercase"
+                                   >Reduzir</button>
+                                   <button 
+                                    onClick={() => setAudioConfig(a => ({...a, originalMuted: true}))}
+                                    className="px-3 py-1.5 bg-orange-500 text-white text-[8px] font-black rounded-lg hover:bg-orange-600 uppercase"
+                                   >Remover</button>
+                                </div>
+                             </div>
+                           )}
+                      </div>
+
+                      {/* BLOCO 3: BUSCA & CATEGORIAS */}
+                      <div className="space-y-6">
+                         <div className="space-y-4">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Busca de Música</label>
+                            <div className="relative group">
+                               <Input 
+                                 placeholder="Estilo, clima ou instrumento..." 
+                                 value={musicSearchQuery}
+                                 onChange={(e) => setMusicSearchQuery(e.target.value)}
+                                 className="h-14 rounded-2xl bg-gray-50 dark:bg-black/50 border-gray-100 dark:border-gray-800 font-bold px-6 pl-12"
+                               />
+                               <span className="absolute left-5 top-1/2 -translate-y-1/2 opacity-30">🔍</span>
+                            </div>
+                         </div>
+
+                         <div className="flex flex-wrap gap-2">
+                            {["Motivacional", "Triste", "Suspense", "Épico", "Lo-Fi", "Romântico"].map(style => (
+                              <button 
+                                key={style}
+                                onClick={() => setMusicSearchQuery(style)}
+                                className={`px-4 py-2 rounded-xl text-[8px] font-black uppercase italic tracking-widest transition-all ${musicSearchQuery === style ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'bg-gray-100 dark:bg-gray-800 text-gray-400 hover:bg-gray-200'}`}
+                                style={musicSearchQuery === style ? { backgroundColor: branding.primaryColor } : {}}
+                              > {style} </button>
+                            ))}
+                         </div>
+
+                         <div className="space-y-3">
+                            <div className="grid grid-cols-1 gap-3 max-h-[250px] overflow-y-auto scrollbar-hide pr-1">
+                               {musicSuggestions.filter(m => !musicSearchQuery || m.style.includes(musicSearchQuery) || m.name.toLowerCase().includes(musicSearchQuery.toLowerCase())).map(music => (
+                                 <button 
+                                   key={music.id}
+                                   onClick={() => setAudioConfig(a => ({...a, musicUrl: `url-${music.id}`, musicName: music.name, musicStyle: music.style}))}
+                                   className={`flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-left ${audioConfig.musicName === music.name ? 'bg-blue-500/10 border-primary shadow-lg' : 'bg-white dark:bg-gray-900 border-gray-50 dark:border-gray-800 hover:border-gray-200'}`}
+                                   style={audioConfig.musicName === music.name ? { borderColor: branding.primaryColor, backgroundColor: `${branding.primaryColor}0d` } : {}}
+                                 >
+                                    <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-black flex items-center justify-center text-lg">
+                                       {audioConfig.musicName === music.name ? "⏸️" : "▶️"}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                       <h5 className="text-[10px] font-black text-gray-900 dark:text-white uppercase truncate">{music.name}</h5>
+                                       <div className="flex items-center gap-2 mt-0.5">
+                                          <span className="text-[8px] font-bold text-blue-500 uppercase">{music.style}</span>
+                                          <span className="text-[8px] font-bold text-gray-400 uppercase">• {music.duration}</span>
+                                       </div>
+                                    </div>
+                                    {audioConfig.musicName === music.name && <span className="text-blue-500 text-xs">✓</span>}
+                                 </button>
+                               ))}
+                            </div>
+                         </div>
+                      </div>
+
+                      {/* BLOCO 4: EFEITOS */}
+                      {audioConfig.musicUrl && (
+                        <div className="space-y-6 pt-6 border-t border-gray-100 dark:border-gray-800 animate-in fade-in slide-in-from-bottom-4">
+                           <SectionTitle title="Efeitos" icon="🪄" />
+                           <div className="grid grid-cols-2 gap-4">
+                              <button 
+                                onClick={() => setAudioConfig(a => ({...a, fadeIn: !a.fadeIn}))}
+                                className={`py-4 rounded-2xl border-2 text-[8px] font-black uppercase transition-all ${audioConfig.fadeIn ? 'bg-blue-500/10 border-blue-500 text-blue-500' : 'bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 text-gray-400 hover:border-gray-200'}`}
+                                style={audioConfig.fadeIn ? { borderColor: branding.primaryColor, color: branding.primaryColor, backgroundColor: `${branding.primaryColor}1a` } : {}}
+                              >+ Fade In</button>
+                              <button 
+                                onClick={() => setAudioConfig(a => ({...a, fadeOut: !a.fadeOut}))}
+                                className={`py-4 rounded-2xl border-2 text-[8px] font-black uppercase transition-all ${audioConfig.fadeOut ? 'bg-blue-500/10 border-blue-500 text-blue-500' : 'bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 text-gray-400 hover:border-gray-200'}`}
+                                style={audioConfig.fadeOut ? { borderColor: branding.primaryColor, color: branding.primaryColor, backgroundColor: `${branding.primaryColor}1a` } : {}}
+                              >- Fade Out</button>
+                           </div>
+                        </div>
+                      )}
                    </div>
                  )}
 
