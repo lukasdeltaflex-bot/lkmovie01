@@ -316,7 +316,7 @@ export default function BuscarCenasPage() {
              <div className="flex gap-3">
                 <Button 
                   variant="outline" 
-                  className="rounded-2xl px-6 py-3 text-[10px] h-auto font-black border-2 border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900 transition-all" 
+                  className="rounded-2xl px-6 py-3 text-[10px] h-auto font-black shadow-sm" 
                   onClick={handleClear}
                 >
                   LIMPAR TUDO
@@ -403,9 +403,10 @@ export default function BuscarCenasPage() {
           {nextPageToken && (
             <div className="flex justify-center pt-10">
                <Button 
+                variant="secondary"
                 onClick={() => handleSearch(undefined, undefined, true)}
                 disabled={loadingMore}
-                className="px-14 h-20 rounded-3xl bg-white dark:bg-gray-900 border-2 border-gray-100 dark:border-gray-800 text-gray-900 dark:text-white font-black text-xl hover:bg-gray-50 dark:hover:bg-black shadow-2xl transition-all transform active:scale-95 disabled:opacity-50 flex items-center gap-4"
+                className="px-14 h-20 rounded-3xl font-black text-xl shadow-2xl transition-all flex items-center gap-4"
                >
                  {loadingMore ? (
                    <>
