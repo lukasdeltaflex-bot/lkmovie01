@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { searchYouTubeVideos, YouTubeVideo } from "@/lib/youtube/search-videos";
+import { YouTubeVideo } from "@/lib/youtube/search-videos";
 import { useSelectedVideo } from "@/context/selected-video-context";
 import { useBranding } from "@/context/branding-context";
 import { useAuth } from "@/context/auth-context";
@@ -40,8 +40,15 @@ export default function BuscarCenasPage() {
     setError(null);
 
     try {
-      const videos = await searchYouTubeVideos(searchTerm);
-      setResults(videos);
+      // CHAMADA REAL PARA A NOSSA API INTERNA (que por sua vez chama o YouTube)
+      const response = await fetch(`/api/youtube/search?q=${encodeURIComponent(searchTerm)}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erro ao buscar vídeos reais no YouTube.");
+      }
+
+      setResults(data);
       
       // Salvar histórico no Firestore
       if (user) {
@@ -217,7 +224,7 @@ export default function BuscarCenasPage() {
                   </h3>
                   <div className="flex items-center justify-between border-t border-gray-50 dark:border-gray-800 pt-4">
                      <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest truncate max-w-[150px]">
-                       {video.channelTitle}
+                       {video.channel}
                      </span>
                      <div className="w-8 h-8 rounded-full flex items-center justify-center bg-gray-50 dark:bg-black border border-gray-100 dark:border-gray-800 text-[10px] font-bold group-hover:bg-primary group-hover:text-white transition-colors" style={{ groupHover: { backgroundColor: branding.primaryColor } } as any}>
                         HD
