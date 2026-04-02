@@ -38,7 +38,7 @@ export default function VideoPage() {
         <div className="p-8 space-y-6">
           <div className="space-y-2">
              <h2 className="text-2xl font-bold text-white leading-tight" dangerouslySetInnerHTML={{ __html: selectedVideo.title }}></h2>
-             <p className="text-lg text-blue-400 font-medium">{selectedVideo.channelTitle}</p>
+             <p className="text-lg text-blue-400 font-medium">{selectedVideo.channel}</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 
 export default function ConfiguracoesPage() {
-  const { branding, setBranding, loading: brandingLoading } = useBranding();
+  const { branding, setBranding, loading: brandingLoading, showToast } = useBranding();
   const { theme, setTheme } = useTheme();
   const [activeTab, setActiveTab] = useState("aparencia");
   const [isSaving, setIsSaving] = useState(false);
@@ -24,10 +24,10 @@ export default function ConfiguracoesPage() {
     setIsSaving(true);
     try {
       await setBranding(localBranding);
-      alert("Marca e Configurações salvas no Firestore com sucesso!");
+      showToast("Configurações salvas com sucesso!", "success");
     } catch (error) {
       console.error(error);
-      alert("Erro ao salvar configurações.");
+      showToast("Erro ao salvar configurações no Cloud.", "error");
     } finally {
       setIsSaving(false);
     }

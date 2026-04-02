@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { useAuth } from "./auth-context";
 import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
+import { Toast } from "@/components/ui/Toast";
 
 export interface Branding {
   appName: string;
@@ -19,6 +20,7 @@ interface BrandingContextType {
   branding: Branding;
   setBranding: (branding: Partial<Branding>, persist?: boolean) => Promise<void>;
   loading: boolean;
+  showToast: (message: string, type?: "success" | "error" | "info" | "warning") => void;
 }
 
 const defaultBranding: Branding = {
@@ -38,6 +40,7 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
   const [branding, setBrandingState] = useState<Branding>(defaultBranding);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" | "warning" } | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -92,17 +95,8 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
     }
   }, [branding, mounted]);
 
-  const updateBranding = async (newBranding: Partial<Branding>) => {
-    setBrandingState((prev) => ({ ...prev, ...newBranding }));
-    
-    if (user && db) {
-      try {
-        const userSettingsRef = doc(db, "user_settings", user.uid);
-        await setDoc(userSettingsRef, { ...branding, ...newBranding }, { merge: true });
-      } catch (error) {
-        console.error("Erro ao salvar branding no Firestore:", error);
-      }
-    }
+  const showToast = (message: string, type: "success" | "error" | "info" | "warning" = "info") => {
+    setToast({ message, type });
   };
 
   const setBranding = async (newBranding: Partial<Branding>, persist = true) => {
@@ -121,8 +115,15 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
 
   return (
     <ThemeWrapper mounted={mounted}>
-      <BrandingContext.Provider value={{ branding, setBranding, loading }}>
+      <BrandingContext.Provider value={{ branding, setBranding, loading, showToast }}>
         {children}
+        {toast && (
+          <Toast 
+            message={toast.message} 
+            type={toast.type} 
+            onClose={() => setToast(null)} 
+          />
+        )}
       </BrandingContext.Provider>
     </ThemeWrapper>
   );

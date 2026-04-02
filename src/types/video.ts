@@ -3,5 +3,4 @@ export interface YouTubeVideo {
   title: string;
   thumbnail: string;
   channel: string;
-  channelTitle: string;
 }

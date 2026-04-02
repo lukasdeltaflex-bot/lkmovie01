@@ -27,9 +27,16 @@ export default function DashboardLayout({
 
   if (loading) {
     return (
-      <div className="h-screen w-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 gap-4">
-        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-        <span className="font-bold text-blue-600 animate-pulse">Carregando LKMOVIE01...</span>
+      <div className="h-screen w-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 gap-6">
+        <div className="relative w-20 h-20">
+          <div className="absolute inset-0 rounded-3xl border-4 border-blue-500/10 animate-pulse"></div>
+          <div className="absolute inset-0 rounded-3xl border-t-4 border-blue-600 animate-spin" style={{ borderTopColor: branding.primaryColor }}></div>
+          <div className="absolute inset-0 flex items-center justify-center text-4xl">🎬</div>
+        </div>
+        <div className="text-center space-y-1">
+          <h2 className="text-xl font-black text-gray-900 dark:text-white tracking-widest uppercase italic">{branding.appName}</h2>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.4em] animate-pulse">Sincronizando Sessão...</p>
+        </div>
       </div>
     );
   }
@@ -38,23 +45,23 @@ export default function DashboardLayout({
 
   return (
     <SelectedVideoProvider>
-      <div className="flex h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors duration-300 overflow-hidden">
+      <div className="flex h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors duration-300 overflow-hidden font-sans">
         <Sidebar />
         <main 
-          className={`flex-1 overflow-y-auto p-4 md:p-8 transition-all duration-300 w-full ${
-            sidebarCollapsed ? "md:ml-20" : "md:ml-64"
+          className={`flex-1 overflow-y-auto px-4 py-8 md:px-12 md:py-10 transition-all duration-500 w-full relative ${
+            sidebarCollapsed ? "md:ml-20" : "md:ml-72"
           }`}
         >
-          {/* Header Global Flutuante / Home Mobile Trigger */}
-          <div className="flex justify-between md:justify-end items-center sticky top-0 z-30 mb-8 pointer-events-none">
-             <div className="md:hidden pointer-events-auto bg-white/80 dark:bg-gray-950/80 backdrop-blur-md p-2 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-xl w-12 h-12 flex items-center justify-center overflow-hidden">
+          {/* Header Global Flutuante */}
+          <div className="flex justify-between md:justify-end items-center sticky top-0 z-[40] mb-12 pointer-events-none">
+             <div className="md:hidden pointer-events-auto bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl p-3 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-2xl w-14 h-14 flex items-center justify-center overflow-hidden active:scale-95 transition-all">
                 {branding.logo.length > 2 ? (
-                  <img src={branding.logo} alt="Logo" className="w-8 h-8 object-contain" />
+                  <img src={branding.logo} alt="Logo" className="w-10 h-10 object-contain" />
                 ) : (
-                  <span className="text-2xl">{branding.logo}</span>
+                  <span className="text-3xl">{branding.logo}</span>
                 )}
              </div>
-             <div className="pointer-events-auto">
+             <div className="pointer-events-auto bg-white/50 dark:bg-gray-900/50 backdrop-blur-xl rounded-full p-1 border border-white/20 dark:border-gray-800 shadow-lg">
                 <NotificationBell />
              </div>
           </div>
