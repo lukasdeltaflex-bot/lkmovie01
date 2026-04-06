@@ -248,13 +248,13 @@ export default function BuscarCenasPage() {
               </Button>
             </form>
 
-            <div className="flex flex-wrap items-center justify-center gap-2 pt-4">
-              <span className="text-[10px] font-black text-white/50 uppercase tracking-widest mr-2">Sugestões:</span>
-              {["Cinematic Sky", "Hyperlapse City", "Drone Nature", "Abstract 4k"].map(term => (
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-6">
+              <span className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] mr-2">Top Sugestões:</span>
+              {["Cinematic Sky", "Hyperlapse City", "Drone Nature", "Abstract 4k", "Motivation Jordan Peterson"].map(term => (
                 <button 
                   key={term}
                   onClick={() => setPresetSearch(term)}
-                  className="px-4 py-2 bg-black/10 hover:bg-black/20 rounded-xl text-[10px] font-black text-white transition-all border border-white/5"
+                  className="px-5 py-2.5 bg-white/5 hover:bg-white/20 rounded-2xl text-[11px] font-black text-white transition-all border border-white/10 hover:scale-105 active:scale-95 shadow-lg"
                 >{term}</button>
               ))}
             </div>

@@ -4,239 +4,180 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/auth-context";
 import { useBranding } from "@/context/branding-context";
-import { getRecentProjects, SavedProject, getUserProjects } from "@/lib/firebase/projects";
+import { getRecentProjects, SavedProject } from "@/lib/firebase/projects";
 import { getUserRenderJobs, getLastUserRenderJob } from "@/lib/firebase/render-jobs";
-import { getUserSearchHistory, SearchRecord } from "@/lib/firebase/search";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { OnboardingModal } from "@/components/dashboard/OnboardingModal";
-import { createNotification } from "@/lib/firebase/notifications";
+import { AutoVideoModal } from "@/components/dashboard/AutoVideoModal";
 import { RenderJob } from "@/types/render";
 import { PLAN_LIMITS } from "@/lib/utils/usage-limits";
+import { ProductionChart } from "@/components/dashboard/ProductionChart";
+import { ActivityLog } from "@/components/dashboard/ActivityLog";
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const { branding, setBranding } = useBranding();
+  const { branding, showToast } = useBranding();
   const [recentProjects, setRecentProjects] = useState<SavedProject[]>([]);
-  const [recentSearches, setRecentSearches] = useState<SearchRecord[]>([]);
   const [renderStats, setRenderStats] = useState({ total: 0, pending: 0, completed: 0 });
   const [lastJob, setLastJob] = useState<RenderJob | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showAutoModal, setShowAutoModal] = useState(false);
 
   const userName = user?.email?.split('@')[0] || "Visitante";
+  const referralCode = branding.referralCode || "GERANDO...";
 
   useEffect(() => {
     const fetchData = async () => {
       if (!user) return;
       try {
-        const [projects, searches, allJobs, lastJobData] = await Promise.all([
+        const [projects, allJobs, lastJobData] = await Promise.all([
           getRecentProjects(user.uid, 4),
-          getUserSearchHistory(user.uid, 5),
           getUserRenderJobs(user.uid),
           getLastUserRenderJob(user.uid)
         ]);
 
         setRecentProjects(projects);
-        setRecentSearches(searches);
         setLastJob(lastJobData);
-        
         setRenderStats({
           total: allJobs.length,
           pending: allJobs.filter(j => j.status === "pending" || j.status === "processing").length,
           completed: allJobs.filter(j => j.status === "completed").length
         });
-
       } catch (error) {
         console.error("Erro ao carregar Dashboard:", error);
       } finally {
         setLoading(false);
       }
     };
-
     fetchData();
   }, [user]);
 
-  if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto space-y-12 animate-in fade-in duration-500">
-        <Skeleton className="h-40 w-full rounded-4xl opacity-10" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-           {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-52 rounded-4xl opacity-5" />)}
-        </div>
-      </div>
-    );
-  }
+  const copyReferral = () => {
+    const url = `${window.location.origin}/login?ref=${referralCode}`;
+    navigator.clipboard.writeText(url);
+    if (showToast) showToast("Link de indicação copiado! 🎉", "success");
+  };
 
-  const usage = branding.usage || { searchesCount: 0, projectsCount: 0, rendersCount: 0 };
+  if (loading) return <div className="p-20 text-center font-black animate-pulse uppercase tracking-[0.5em]">Carregando Smart Dashboard...</div>;
+
+  const usage = branding.usage || { searchesCount: 0, projectsCount: 0, rendersCount: 0, referralsCount: 0 };
   const plan = branding.plan || "free";
   const limits = PLAN_LIMITS[plan as keyof typeof PLAN_LIMITS];
 
   return (
-    <div className="max-w-7xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-1000 pb-20 px-4 lg:px-0">
-      
-      {!branding.hasSeenOnboarding && (
-        <OnboardingModal onComplete={() => setBranding({ hasSeenOnboarding: true })} />
-      )}
+    <div className="max-w-7xl mx-auto space-y-12 animate-in fade-in duration-1000 pb-20 px-4">
+      {showAutoModal && <AutoVideoModal onClose={() => setShowAutoModal(false)} />}
 
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-8">
         <div className="space-y-4">
-          <div className="flex items-center gap-3 text-xs font-black text-gray-400 uppercase tracking-[0.3em]">
-             <span className="w-2 h-2 rounded-full animate-pulse shadow-[0_0_8px_currentColor] bg-blue-500"></span>
-             Sistema Premium {plan.toUpperCase()}
+          <div className="flex items-center gap-3 text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">
+             <span className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_10px_#3b82f6]"></span>
+             Intelligence Hub {plan.toUpperCase()}
           </div>
-          <h1 className="text-5xl md:text-7xl font-black text-gray-900 dark:text-white tracking-tighter leading-none">
-            Olá, <span className="bg-clip-text text-transparent italic bg-gradient-to-r from-blue-500 to-indigo-600">{userName}</span>
+          <h1 className="text-5xl md:text-7xl font-black text-white tracking-tighter leading-none">
+            Welcome, <span className="bg-clip-text text-transparent italic bg-gradient-to-r from-blue-400 to-indigo-500">{userName}</span>
           </h1>
-          <p className="text-gray-500 dark:text-gray-400 font-bold text-lg md:text-xl max-w-2xl">Sua central de inteligência e produção cinematográfica.</p>
         </div>
 
-        {plan === "free" && (
-          <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-6 rounded-3xl shadow-2xl flex items-center gap-6 group hover:scale-105 transition-all cursor-pointer">
-             <div className="space-y-1">
-                <p className="text-[10px] font-black text-white/60 uppercase tracking-widest">Upgrade Disponível</p>
-                <h4 className="text-white font-black uppercase italic">Vire PRO hoje 🚀</h4>
-             </div>
-             <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-xl">💎</div>
-          </div>
-        )}
-      </header>
-
-      {/* DASHBOARD ANALYTICS & USAGE */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-        
-        {/* USAGE LIMITS */}
-        <div className="lg:col-span-4 bg-white dark:bg-gray-900 rounded-4xl border border-gray-100 dark:border-gray-800 p-10 shadow-2xl space-y-8">
-           <div className="flex justify-between items-center">
-              <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tighter uppercase italic">Uso do Plano</h3>
-              <span className="px-3 py-1 bg-blue-50 dark:bg-blue-500/10 text-blue-600 text-[10px] font-black rounded-lg uppercase">{plan}</span>
+        <div className="flex gap-4">
+           {/* REFERRAL QUICK ACCESS */}
+           <div className="bg-white/5 border border-white/10 p-5 rounded-3xl flex items-center gap-6">
+              <div>
+                 <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest leading-none">Seu Código</p>
+                 <p className="text-lg font-black text-blue-400 italic mt-1">{referralCode}</p>
+              </div>
+              <Button onClick={copyReferral} variant="outline" className="h-12 px-6 rounded-2xl border-white/10 text-[9px] font-black uppercase">Indicador PRO 🚀</Button>
            </div>
            
-           <div className="space-y-6">
-              <UsageBar label="Buscas diárias" current={usage.searchesCount} max={limits.maxDailySearches} color="#3b82f6" />
-              <UsageBar label="Projetos ativos" current={usage.projectsCount} max={limits.maxProjects} color="#8b5cf6" />
-              <UsageBar label="Renderizações" current={usage.rendersCount} max={limits.maxRenders} color="#10b981" />
+           <Button onClick={() => setShowAutoModal(true)} className="h-20 px-10 rounded-3xl bg-blue-600 font-black italic shadow-2xl">GERAÇÃO MÁGICA 🪄</Button>
+        </div>
+      </header>
+
+      {/* METRICS & GROWTH */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+        <div className="lg:col-span-8 space-y-8">
+           <ProductionChart color="#3b82f6" />
+           
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <MetricCard title="CRESCIMENTO ORGÂNICO" value={usage.referralsCount?.toString() || "0"} icon="📈" badge="Indicados" trend="+100%" color="#10b981" />
+              <MetricCard title="ENGAJAMENTO VIRAL" value={recentProjects.length.toString()} icon="🔥" badge="Atividade" trend="Ativo" color="#f59e0b" />
+           </div>
+        </div>
+
+        <div className="lg:col-span-4 space-y-8">
+           {/* USAGE LIMITS */}
+           <div className="bg-white dark:bg-gray-900 rounded-4xl border border-gray-100 dark:border-gray-800 p-10 shadow-2xl space-y-8">
+              <h3 className="text-xl font-black text-white tracking-tighter uppercase italic">SaaS Power Metrics</h3>
+              <div className="space-y-6">
+                 <UsageBar label="Buscas (24h)" current={usage.searchesCount} max={limits.maxDailySearches} color="#3b82f6" />
+                 <UsageBar label="Projetos" current={usage.projectsCount} max={limits.maxProjects} color="#8b5cf6" />
+                 <UsageBar label="Renderizações" current={usage.rendersCount} max={limits.maxRenders} color="#10b981" />
+              </div>
+              <Link href="/perfil" className="block"><Button className="w-full h-14 rounded-2xl border-white/10 font-black text-[10px] uppercase">Gerenciar Plano 💎</Button></Link>
            </div>
 
-           <Button className="w-full h-14 rounded-2xl bg-gray-50 dark:bg-black text-gray-900 dark:text-white border border-gray-100 dark:border-gray-800 font-black text-xs uppercase tracking-widest hover:bg-gray-100 transition-all">Ver Detalhes do Plano</Button>
-        </div>
-
-        {/* METRICS */}
-        <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-8">
-           <MetricCard 
-              title="HISTÓRICO TOTAL" 
-              value={branding.analytics?.totalRenders?.toString() || "0"} 
-              icon="🎬" 
-              badge="Vídeos Gerados" 
-              color="#3b82f6" 
-           />
-           <MetricCard 
-              title="BUSCAS REALIZADAS" 
-              value={branding.analytics?.totalSearches?.toString() || "0"} 
-              icon="🔍" 
-              badge="Inteligência" 
-              color="#10b981" 
-           />
+           <ActivityLog />
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-         
-         {/* ÚLTIMA ATIVIDADE DE RENDER */}
-         <div className="lg:col-span-8 space-y-8">
-            <div className="flex justify-between items-end border-b border-gray-100 dark:border-gray-800 pb-6">
-               <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter uppercase italic">Renderização Ativa</h2>
-               <Link href="/biblioteca" className="text-[10px] font-black uppercase text-blue-500">Ver Fila ➔</Link>
-            </div>
-            
-            {lastJob ? (
-               <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[2.5rem] p-8 flex flex-col md:flex-row gap-8 items-center shadow-xl group hover:border-blue-500 transition-all">
-                  <div className="w-40 h-40 bg-gray-50 dark:bg-black rounded-4xl flex items-center justify-center text-5xl shadow-inner shrink-0 group-hover:scale-105 transition-transform">
+      {/* RECENT OPERATIONAL LOG */}
+      <div className="space-y-8">
+         <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter border-b border-white/5 pb-4">Real-Time Operations</h2>
+         {lastJob ? (
+            <div className="bg-white/5 border border-white/10 p-10 rounded-[3rem] flex items-center justify-between group hover:border-blue-500 transition-all">
+               <div className="flex items-center gap-8">
+                  <div className="w-24 h-24 bg-black rounded-[2rem] flex items-center justify-center text-4xl shadow-inner">
                      {lastJob.status === 'completed' ? '✅' : '⚙️'}
                   </div>
-                  <div className="space-y-4 flex-1">
-                     <div className="flex items-center gap-3">
-                        <span className={`w-3 h-3 rounded-full ${lastJob.status === 'completed' ? 'bg-green-500' : 'bg-blue-500 animate-pulse'}`}></span>
-                        <p className="text-xs font-black uppercase tracking-widest text-gray-500">JOB: {lastJob.id?.slice(-8).toUpperCase()}</p>
-                     </div>
-                     <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter uppercase">{lastJob.status === 'completed' ? 'Concluído com Sucesso' : 'Processando em Nuvem'}</h3>
-                     <div className="w-full h-3 bg-gray-100 dark:bg-black rounded-full overflow-hidden">
+                  <div className="space-y-2">
+                     <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Target: {lastJob.id}</p>
+                     <h3 className="text-2xl font-black uppercase text-white">{lastJob.status === 'completed' ? 'Transmissão Pronta' : 'Renderizando Nuvem'}</h3>
+                     <div className="w-64 h-2 bg-black rounded-full overflow-hidden">
                         <div className="h-full bg-blue-500 transition-all duration-1000" style={{ width: `${lastJob.progress}%` }}></div>
-                     </div>
-                     <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase">
-                        <span>Progresso: {lastJob.progress}%</span>
-                        <span>{lastJob.status.toUpperCase()}</span>
                      </div>
                   </div>
                </div>
-            ) : (
-               <div className="bg-white dark:bg-gray-950 border-4 border-dashed border-gray-100 dark:border-gray-800 rounded-[3rem] p-24 flex flex-col items-center text-center space-y-8">
-                  <div className="w-32 h-32 bg-gray-50 dark:bg-gray-900 rounded-full flex items-center justify-center text-5xl shadow-2xl">🎬</div>
-                  <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter uppercase italic">Sua produção começa aqui</h3>
-                  <Link href="/buscar-cenas">
-                    <Button className="font-black px-12 py-8 rounded-2xl shadow-2xl text-lg tracking-widest bg-blue-500 text-white hover:scale-110 transition-transform">INICIAR PRODUÇÃO 🚀</Button>
-                  </Link>
-               </div>
-            )}
-         </div>
-
-         {/* ATALHOS RÁPIDOS */}
-         <div className="lg:col-span-4 space-y-8">
-            <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter uppercase italic border-b border-gray-100 dark:border-gray-800 pb-6">Atalhos</h2>
-            <div className="grid grid-cols-1 gap-4">
-               {[
-                 { label: "Minerar Cenas", icon: "🔍", href: "/buscar-cenas", color: "#3b82f6" },
-                 { label: "Biblioteca", icon: "📚", href: "/biblioteca", color: "#8b5cf6" },
-                 { label: "Configurações", icon: "🎨", href: "/configuracoes", color: "#6b7280" }
-               ].map((item) => (
-                  <Link 
-                    key={item.href} 
-                    href={item.href} 
-                    className="flex items-center gap-6 p-6 bg-white dark:bg-gray-900 rounded-3xl border border-gray-100 dark:border-gray-800 hover:border-blue-500 transition-all shadow-lg group active:scale-95"
-                  >
-                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-inner group-hover:rotate-12 transition-transform" style={{ backgroundColor: `${item.color}15`, color: item.color }}>{item.icon}</div>
-                    <h3 className="font-black text-gray-900 dark:text-white text-lg uppercase italic transition-colors">{item.label}</h3>
-                  </Link>
-               ))}
+               <Link href={`/video/${lastJob.id}`}>
+                 <Button variant="outline" className="h-16 px-10 rounded-2xl border-white/10 font-black uppercase tracking-widest">Link Público ➔</Button>
+               </Link>
             </div>
-         </div>
+         ) : (
+            <div className="p-20 border-4 border-dashed border-white/5 rounded-[3rem] text-center italic text-gray-500 font-bold">Inicie sua primeira produção viral.</div>
+         )}
       </div>
     </div>
   );
 }
 
-function UsageBar({ label, current, max, color }: { label: string, current: number, max: number, color: string }) {
-  const percent = Math.min((current / max) * 100, 100);
+function UsageBar({ label, current, max, color }: any) {
+  const percent = Math.min((current/max)*100, 100);
   return (
     <div className="space-y-2">
-       <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
-          <span className="text-gray-400">{label}</span>
-          <span className="text-gray-900 dark:text-white">{current} / {max}</span>
+       <div className="flex justify-between text-[9px] font-black uppercase text-gray-400">
+          <span>{label}</span>
+          <span>{current}/{max}</span>
        </div>
-       <div className="w-full h-2 bg-gray-50 dark:bg-black rounded-full overflow-hidden shadow-inner">
-          <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${percent}%`, backgroundColor: color }}></div>
+       <div className="w-full h-1.5 bg-black rounded-full overflow-hidden">
+          <div className="h-full transition-all duration-1000" style={{ width: `${percent}%`, backgroundColor: color }}></div>
        </div>
     </div>
   );
 }
 
-function MetricCard({ title, value, icon, badge, color, progress }: { title: string, value: string, icon: string, badge: string, color: string, progress?: number }) {
+function MetricCard({ title, value, icon, badge, color, trend }: any) {
   return (
-    <div className="bg-white dark:bg-gray-900 p-10 rounded-4xl border border-gray-100 dark:border-gray-800 shadow-2xl flex flex-col justify-between h-60 group relative overflow-hidden">
-        <div className="flex justify-between items-start relative z-10">
-          <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">{title}</span>
-          <span className="p-5 bg-gray-50 dark:bg-black text-2xl rounded-2xl group-hover:rotate-12 transition-transform shadow-inner border border-gray-100 dark:border-gray-800" style={{ color }}>{icon}</span>
-        </div>
-        <div className="relative z-10 space-y-4">
-          <div className="flex items-baseline gap-4">
-            <span className="text-6xl font-black text-gray-900 dark:text-white tracking-tighter">{value}</span>
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest bg-gray-50 dark:bg-black px-3 py-1.5 rounded-xl border border-gray-100 dark:border-gray-800">{badge}</span>
+    <div className="bg-white/5 border border-white/10 p-8 rounded-[2.5rem] flex flex-col justify-between group h-52 hover:scale-[1.02] transition-all relative overflow-hidden">
+       <div className="flex justify-between items-start relative z-10">
+          <div>
+             <p className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em]">{title}</p>
+             <p className="text-[10px] font-black text-green-500 mt-1">{trend}</p>
           </div>
-          {progress !== undefined && (
-            <div className="w-full h-2 bg-gray-100 dark:bg-black rounded-full overflow-hidden shadow-inner">
-               <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${progress}%`, backgroundColor: color }}></div>
-            </div>
-          )}
-        </div>
+          <span className="w-12 h-12 bg-black rounded-2xl flex items-center justify-center text-xl shadow-inner" style={{ color }}>{icon}</span>
+       </div>
+       <div className="relative z-10">
+          <p className="text-5xl font-black text-white items-baseline flex gap-4">{value} <span className="text-[10px] uppercase font-bold text-gray-600 bg-black px-2 py-1 rounded-lg">{badge}</span></p>
+       </div>
+       <div className="absolute -right-4 -bottom-4 w-24 h-24 opacity-5 border-[10px] border-current rounded-full" style={{ color }}></div>
     </div>
   );
 }
