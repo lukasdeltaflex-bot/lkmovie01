@@ -5,13 +5,14 @@ import Link from "next/link";
 import { useSelectedVideo } from "@/context/selected-video-context";
 import { useAuth } from "@/context/auth-context";
 import { useBranding } from "@/context/branding-context";
-import { useSearchParams } from "next/navigation";
-import { createProject, updateProject, SavedProject } from "@/lib/firebase/projects";
+import { useSearchParams, useRouter } from "next/navigation";
+import { createProject, updateProject, getProjectById } from "@/lib/firebase/projects";
+import { createRenderJob } from "@/lib/firebase/render-jobs";
 import { saveEditorPreset, getUserPresets, EditorPreset } from "@/lib/firebase/presets";
-import { createNotification } from "@/lib/firebase/notifications";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import axios from "axios";
+import { SavedProject } from "@/types/project.d";
 
 type AspectRatio = "16:9" | "9:16" | "1:1";
 type EditorSection = "video" | "subtitle" | "audio" | "watermark" | "final";
@@ -21,77 +22,34 @@ export default function EditorPage() {
   const { user } = useAuth();
   const { branding, showToast } = useBranding();
   const searchParams = useSearchParams();
-  const mode = searchParams.get("mode");
-
+  const router = useRouter();
+  
   const [activeSection, setActiveSection] = useState<EditorSection>("video");
-  const [projectId, setProjectId] = useState<string | null>(null);
+  const [projectId, setProjectId] = useState<string | null>(searchParams.get("id"));
   const [isSaving, setIsSaving] = useState(false);
   const [isRendering, setIsRendering] = useState(false);
   const [renderProgress, setRenderProgress] = useState(0);
   const [renderStatus, setRenderStatus] = useState("");
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [activeStyle, setActiveStyle] = useState<"none" | "motivational" | "cinema" | "viral">("none");
-  const [renderUrl, setRenderUrl] = useState<string | null>(null);
 
-  // VIDEO STATE (Local and synced with current clip)
+  const [isSuggesting, setIsSuggesting] = useState(false);
+  const [presets, setPresets] = useState<EditorPreset[]>([]);
+
   const [videoConfig, setVideoConfig] = useState({
     aspectRatio: "16:9" as AspectRatio,
-    startTime: 0,
-    endTime: 15,
-    volume: 100,
-    playbackRate: 1.0,
     zoom: 100,
-    isMuted: false,
     showGrid: false,
-    showSafeArea: true,
   });
 
-  // SUBTITLE STATE
   const [subtitle, setSubtitle] = useState({
-    text: "DIGITE SUA LEGENDA AQUI",
-    language: "pt-BR",
-    size: 28,
+    text: "NOVA LEGENDA AQUI",
     color: "#ffffff",
-    backgroundColor: "transparent",
-    outlineColor: "#000000",
-    outlineWidth: 2,
-    shadowAlpha: 0.5,
+    size: 28,
     x: 50,
     y: 80,
-    fontWeight: "900",
-    fontFamily: "Inter, sans-serif",
-    preset: "default",
   });
 
-  // Sincronizar estado local com o clipe ativo ao trocar de clipe
-  useEffect(() => {
-    const currentClip = clips[activeClipIndex];
-    if (currentClip) {
-      setVideoConfig(prev => ({
-        ...prev,
-        zoom: (currentClip as any).zoom || 100,
-        playbackRate: (currentClip as any).playbackRate || 1.0,
-      }));
-      // Se o clipe tiver filtros próprios salvos, aplicar aqui
-      if ((currentClip as any).filters) setFilters((currentClip as any).filters);
-    }
-  }, [activeClipIndex, clips]);
-
-  // Atualizar o array de clips no contexto quando o estado local mudar
-  useEffect(() => {
-    const updatedClips = [...clips];
-    if (updatedClips[activeClipIndex]) {
-      updatedClips[activeClipIndex] = {
-        ...updatedClips[activeClipIndex],
-        zoom: videoConfig.zoom,
-      };
-      // Usar a função setClips do contexto para manter sincronizado
-      // setClips(updatedClips); // Cuidado com loop infinito se não for controlado
-    }
-  }, [videoConfig.zoom, activeClipIndex]);
-
-  // WATERMARK STATE
   const [watermark, setWatermark] = useState({
     url: "",
     opacity: 80,
@@ -100,1096 +58,313 @@ export default function EditorPage() {
     y: 10,
   });
 
-  // COLOR FILTERS
-  const [filters, setFilters] = useState({
-    brightness: 100,
-    contrast: 100,
-    saturation: 100,
-    sepia: 0,
-    blur: 0,
-  });
-
-  // SUBTITLE ANIMATION
-  const [subtitleAnimation, setSubtitleAnimation] = useState<"none" | "pop" | "fade" | "glow">("none");
-
-  // FINAL SCREEN STATE
-  const [finalScreen, setFinalScreen] = useState({
-    url: "",
-    duration: 3,
-    showPreview: false,
-  });
-
-  // AUDIO STATE
   const [audioConfig, setAudioConfig] = useState({
-    originalVolume: 100,
-    originalMuted: false,
     musicUrl: null as string | null,
-    musicName: "",
-    musicStyle: "",
     musicVolume: 50,
-    fadeIn: true,
-    fadeOut: true,
+    videoVolume: 100,
     mixMode: "mix" as "keep" | "remove" | "mix"
   });
 
-  const [musicSearchQuery, setMusicSearchQuery] = useState("");
-  const [isAnalyzingAudio, setIsAnalyzingAudio] = useState(false);
+  const [innerProjectId, setInnerProjectId] = useState<string | null>(projectId);
 
-  const musicSuggestions = [
-    { id: 1, name: "Epic Cinematic Orchestral", style: "Épico", mood: "Heroico", duration: "2:30" },
-    { id: 2, name: "Sunset Lo-Fi Vibes", style: "Casual", mood: "Relaxante", duration: "4:00" },
-    { id: 3, name: "Hyper Digital Success", style: "Motivacional", mood: "Energético", duration: "1:45" },
-    { id: 4, name: "Dark Suspense Pulse", style: "Suspense", mood: "Tenso", duration: "3:10" },
-    { id: 5, name: "Romantic Piano Dream", style: "Romântico", mood: "Suave", duration: "2:50" },
-  ];
-
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-
-  // UX STATE
   const [isDragging, setIsDragging] = useState<"subtitle" | "watermark" | null>(null);
-  const [presets, setPresets] = useState<EditorPreset[]>([]);
   const videoContainerRef = useRef<HTMLDivElement>(null);
-  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (user) getUserPresets(user.uid).then(setPresets);
+    if (innerProjectId && user) {
+      getProjectById(innerProjectId).then(proj => {
+        if (proj) {
+          setSubtitle({
+            text: proj.subtitleText,
+            color: proj.subtitleColor,
+            size: proj.subtitleSize,
+            x: 50,
+            y: proj.subtitlePosition === "bottom" ? 80 : proj.subtitlePosition === "top" ? 20 : 50
+          });
+          setWatermark({
+            url: proj.watermarkUrl,
+            opacity: proj.watermarkOpacity,
+            size: proj.watermarkScale * 500,
+            x: proj.watermarkPosition.includes("right") ? 90 : 10,
+            y: proj.watermarkPosition.includes("bottom") ? 90 : 10,
+          });
+          setAudioConfig({
+            musicUrl: null,
+            musicVolume: proj.volumeMusic * 100,
+            videoVolume: proj.volumeVideo * 100,
+            mixMode: proj.audioMode
+          });
+        }
+      });
+    }
+  }, [innerProjectId, user]);
+
+  useEffect(() => {
+    if (user) {
+      getUserPresets(user.uid).then(setPresets);
+    }
   }, [user]);
-
-  useEffect(() => {
-    if (branding.defaultWatermark && !watermark.url) setWatermark(prev => ({ ...prev, url: branding.defaultWatermark }));
-    if (branding.defaultEndScreen && !finalScreen.url) setFinalScreen(prev => ({ ...prev, url: branding.defaultEndScreen }));
-  }, [branding.defaultWatermark, branding.defaultEndScreen]);
-
-  // DRAG AND DROP PREVIEW
-  const handlePointerDown = (type: "subtitle" | "watermark") => (e: React.PointerEvent) => {
-    e.preventDefault();
-    setIsDragging(type);
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-  };
 
   const handlePointerMove = (e: React.PointerEvent) => {
     if (!isDragging || !videoContainerRef.current) return;
     const rect = videoContainerRef.current.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const y = ((e.clientY - rect.top) / rect.height) * 100;
-    
-    // Bounds check
     const safeX = Math.max(5, Math.min(95, x));
     const safeY = Math.max(5, Math.min(95, y));
 
-    if (isDragging === "subtitle") {
-      setSubtitle(prev => ({ ...prev, x: safeX, y: safeY }));
-    } else {
-      setWatermark(prev => ({ ...prev, x: safeX, y: safeY }));
-    }
+    if (isDragging === "subtitle") setSubtitle(prev => ({ ...prev, x: safeX, y: safeY }));
+    else setWatermark(prev => ({ ...prev, x: safeX, y: safeY }));
   };
 
-  const handlePointerUp = () => setIsDragging(null);
-
-  const handleFileUpload = (type: "watermark" | "final-screen") => (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    if (type === "watermark") setWatermark(prev => ({ ...prev, url }));
-    else setFinalScreen(prev => ({ ...prev, url }));
-  };
-
-  const applyStylePreset = (style: "motivational" | "cinema" | "viral") => {
-    setActiveStyle(style);
-    showToast(`Estilo ${style.toUpperCase()} aplicado!`, "info");
-    switch (style) {
-      case "motivational":
-        setSubtitle(prev => ({ ...prev, text: "Acredite no seu Potencial", size: 42, color: "#facc15", fontWeight: "900", preset: "destaque", y: 50 }));
-        setSubtitleAnimation("pop");
-        setFilters({ brightness: 110, contrast: 120, saturation: 90, sepia: 10, blur: 0 });
-        setVideoConfig(v => ({ ...v, zoom: 110 }));
-        break;
-      case "cinema":
-        setVideoConfig(v => ({ ...v, aspectRatio: "16:9", zoom: 100 }));
-        setSubtitle(prev => ({ ...prev, text: "O GRANDE ENCONTRO", size: 22, color: "#ffffff", backgroundColor: "rgba(0,0,0,0.8)", y: 85, preset: "cinema" }));
-        setFilters({ brightness: 90, contrast: 110, saturation: 60, sepia: 0, blur: 0 });
-        break;
-      case "viral":
-        setSubtitle(prev => ({ ...prev, text: "VOCÊ NÃO VAI ACREDITAR! 👇", size: 38, color: "#000000", backgroundColor: "#ffffff", fontWeight: "900", y: 20, preset: "tiktok" }));
-        setSubtitleAnimation("glow");
-        setFilters({ brightness: 120, contrast: 130, saturation: 150, sepia: 0, blur: 0 });
-        setVideoConfig(v => ({ ...v, zoom: 130 }));
-        break;
-    }
-  };
-
-  useEffect(() => {
-    if (mode === "auto") {
-      setTimeout(() => {
-        applyStylePreset("motivational");
-        showToast("Inteligência Artificial: Modo Automático Ativado 🤖", "success");
-      }, 500);
-    }
-  }, [mode]);
-
-  // AUDIO LOGIC
-  const applyAudioPreset = (preset: "cinema" | "motivational" | "triste" | "viral" | "storytelling") => {
-    setAudioConfig(prev => ({ ...prev, activePreset: preset } as any));
-    showToast(`Áudio Preset: ${preset.toUpperCase()} Ativado!`, "info");
-    switch (preset) {
-      case "cinema":
-        setAudioConfig(v => ({ ...v, originalVolume: 60, musicVolume: 40, fadeIn: true, fadeOut: true }));
-        break;
-      case "motivational":
-        setAudioConfig(v => ({ ...v, originalVolume: 80, musicVolume: 60, fadeIn: true, fadeOut: false }));
-        break;
-      case "triste":
-        setAudioConfig(v => ({ ...v, originalVolume: 40, musicVolume: 80, fadeIn: true, fadeOut: true }));
-        break;
-      case "viral":
-        setAudioConfig(v => ({ ...v, originalVolume: 100, musicVolume: 20, fadeIn: false, fadeOut: false }));
-        break;
-      case "storytelling":
-        setAudioConfig(v => ({ ...v, originalVolume: 100, musicVolume: 10, fadeIn: true, fadeOut: true, originalMuted: false }));
-        break;
-    }
-  };
-
-  const handleAutoAdjustAudio = () => {
-    showToast("Inteligência de Áudio: Analisando Mixagem...", "info");
-    setTimeout(() => {
-      if (audioConfig.musicUrl) {
-         setAudioConfig(prev => ({ ...prev, originalVolume: 20, musicVolume: 80 }));
-         showToast("Mixagem Otimizada! (Prioridade Dublagem)", "success");
-      } else {
-         setAudioConfig(prev => ({ ...prev, originalVolume: 100 }));
-         showToast("Mixagem Otimizada! (Prioridade Original)", "success");
-      }
-    }, 1000);
-  };
-
-  const handleAISuggestion = () => {
-    setIsAnalyzingAudio(true);
-    showToast("IA: Analisando ritmo e cenas do vídeo...", "info");
-    setTimeout(() => {
-      setIsAnalyzingAudio(false);
-      const recommendedStyle = activeStyle === "motivational" ? "Motivacional" : activeStyle === "cinema" ? "Épico" : "Viral";
-      setMusicSearchQuery(recommendedStyle);
-      showToast(`Recomendação IA: Estilo ${recommendedStyle} Identificado!`, "success");
-    }, 2000);
-  };
-
-  const applySubtitlePreset = (preset: string) => {
-    switch (preset) {
-      case "cinema":
-        setSubtitle(prev => ({ ...prev, color: "#ffffff", backgroundColor: "rgba(0,0,0,0.6)", size: 24, outlineWidth: 0, preset: "cinema" }));
-        break;
-      case "tiktok":
-        setSubtitle(prev => ({ ...prev, color: "#000000", backgroundColor: "#ffffff", size: 32, outlineWidth: 0, preset: "tiktok" }));
-        break;
-      case "minimalista":
-        setSubtitle(prev => ({ ...prev, color: "#ffffff", backgroundColor: "transparent", shadowAlpha: 0, outlineWidth: 1, size: 20, preset: "minimalista" }));
-        break;
-      case "destaque":
-        setSubtitle(prev => ({ ...prev, color: "#facc15", backgroundColor: "#000000", outlineWidth: 0, size: 36, preset: "destaque" }));
-        break;
-    }
-  };
-
-  const currentProjectData = useCallback((status: "Draft" | "Rendering" | "Ready" = "Draft"): Omit<SavedProject, "createdAt" | "updatedAt"> | null => {
+  const handleSaveProject = async () => {
     if (!user || !selectedVideo) return null;
-    return {
-      userId: user.uid,
-      videoId: selectedVideo.id,
-      title: selectedVideo.title,
-      thumbnail: selectedVideo.thumbnail,
-      channel: selectedVideo.channel,
-      subtitleText: subtitle.text,
-      subtitleLanguage: subtitle.language,
-      subtitleColor: subtitle.color,
-      subtitleSize: subtitle.size.toString(),
-      subtitlePosition: "custom",
-      watermarkUrl: watermark.url,
-      watermarkOpacity: watermark.opacity,
-      watermarkSize: watermark.size,
-      watermarkPosition: "custom",
-      watermarkX: watermark.x,
-      watermarkY: watermark.y,
-      aspectRatio: videoConfig.aspectRatio,
-      endScreenUrl: finalScreen.url,
-      status
-    };
-  }, [user, selectedVideo, subtitle, watermark, finalScreen.url, videoConfig.aspectRatio]);
-
-  const handleSaveProject = async (isAutoSave = false) => {
-    const data = currentProjectData();
-    if (!data || !user) return;
-    if (!isAutoSave) setIsSaving(true);
+    setIsSaving(true);
     setSaveStatus("saving");
     try {
-      if (projectId) await updateProject(projectId, data);
-      else {
-        const newId = await createProject(data);
-        setProjectId(newId);
+      const projectData: Omit<SavedProject, "id" | "createdAt" | "updatedAt" | "deletedAt" | "status"> = {
+        userId: user.uid,
+        videoId: selectedVideo.id,
+        title: selectedVideo.title,
+        thumbnail: selectedVideo.thumbnail,
+        channelTitle: selectedVideo.channel || "Unknown",
+        subtitleText: subtitle.text,
+        subtitleColor: subtitle.color,
+        subtitleSize: subtitle.size,
+        subtitlePosition: subtitle.y > 60 ? "bottom" : subtitle.y < 40 ? "top" : "center",
+        watermarkUrl: watermark.url || branding.defaultWatermark,
+        watermarkOpacity: watermark.opacity,
+        watermarkPosition: watermark.x > 50 ? (watermark.y > 50 ? "bottom-right" : "top-right") : (watermark.y > 50 ? "bottom-left" : "top-left"),
+        watermarkScale: watermark.size / 500,
+        endScreenUrl: branding.defaultEndScreen,
+        audioMode: audioConfig.mixMode,
+        volumeVideo: audioConfig.videoVolume / 100,
+        volumeMusic: audioConfig.musicVolume / 100,
+      };
+
+      let currentId = innerProjectId;
+      if (currentId) {
+        await updateProject(currentId, projectData as any);
+      } else {
+        currentId = await createProject(projectData);
+        setInnerProjectId(currentId);
       }
+      
       setSaveStatus("success");
       setLastSaved(new Date());
-      if (!isAutoSave) setTimeout(() => setSaveStatus("idle"), 3000);
+      showToast("Projeto salvo!", "success");
+      return currentId;
     } catch (error) {
-       console.error(error);
        setSaveStatus("error");
+       showToast("Erro ao salvar.", "error");
+       return null;
     } finally {
-       if (!isAutoSave) setIsSaving(false);
+       setIsSaving(false);
     }
   };
 
   const handleGenerateVideo = async () => {
-    if (!selectedVideo) return;
+    if (!selectedVideo || !user) return;
+    
+    // Garantir que o projeto está salvo antes de renderizar
+    const currentProjectId = await handleSaveProject();
+    if (!currentProjectId) return;
     
     setIsRendering(true);
+    setRenderStatus("PREPARANDO GERAÇÃO...");
     setRenderProgress(10);
-    setRenderStatus("Iniciando Renderização...");
-
+    
     try {
-      showToast("🚀 Processando vídeo no servidor...", "info");
+      // Criar o Job no Firestore
+      await createRenderJob(user.uid, currentProjectId);
       
-      // Real video extraction would go here. Using a mock URL for the FFmpeg pipeline.
-      const finalVideoUrl = `https://www.youtube.com/watch?v=${selectedVideo.id}`;
-
-      const response = await axios.post("/api/render-video", {
-        videoUrl: finalVideoUrl,
-        subtitle,
-        watermark,
-        audioConfig,
-        aspectRatio: videoConfig.aspectRatio
-      }, {
-        responseType: 'blob',
-        onDownloadProgress: (p) => {
-           const percent = Math.round((p.loaded * 100) / (p.total || 10000000));
-           setRenderProgress(Math.min(95, 10 + percent));
-           setRenderStatus("Renderizando Frames...");
-        }
-      });
-
       setRenderProgress(100);
-      setRenderStatus("Finalizado!");
+      setRenderStatus("SOLICITAÇÃO ENVIADA!");
+      showToast("Geração iniciada! Acompanhe na biblioteca.", "success");
       
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      setRenderUrl(url);
-      setShowSuccessModal(true);
-      showToast("✅ Vídeo gerado com sucesso!", "success");
-
-      if (user) {
-         await createNotification(user.uid, {
-            title: "Vídeo Renderizado",
-            message: `O vídeo "${selectedVideo.title}" foi processado com sucesso.`,
-            type: "success"
-         });
-      }
-
+      setTimeout(() => {
+        router.push("/biblioteca");
+      }, 1500);
     } catch (error: any) {
-      console.error("Render Error:", error);
-      showToast("❌ Erro na renderização. Tente novamente.", "error");
-    } finally {
+      console.error(error);
+      showToast("Erro ao iniciar geração.", "error");
       setIsRendering(false);
     }
   };
 
-  const finishRender = async () => {
-    if (!user || !selectedVideo) return;
-    const data = currentProjectData("Ready");
-    if (data && projectId) await updateProject(projectId, data);
-    createNotification(user.uid, { title: "Vídeo Gerado! 🚀", message: `Sua produção "${selectedVideo.title}" está pronta.`, type: "success" });
-    setIsRendering(false);
-    setRenderProgress(0);
-    setShowSuccessModal(true);
-  };
-
-  useEffect(() => {
-    if (!user || !selectedVideo) return;
-    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    autoSaveTimerRef.current = setTimeout(() => handleSaveProject(true), 5000);
-    return () => { if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current); };
-  }, [subtitle, watermark, finalScreen, videoConfig]);
-
   if (!selectedVideo) {
     return (
-      <div className="h-full flex flex-col items-center justify-center text-center space-y-8 min-h-[70vh] animate-in fade-in duration-1000">
-        <div className="w-32 h-32 rounded-[2.5rem] bg-gray-900 border border-gray-800 flex items-center justify-center text-6xl shadow-2xl animate-bounce">🎬</div>
+      <div className="h-full flex flex-col items-center justify-center text-center space-y-10 min-h-[70vh] animate-in fade-in duration-1000">
+        <div className="w-32 h-32 rounded-4xl bg-gray-100 dark:bg-gray-900 flex items-center justify-center text-6xl shadow-inner border border-gray-100 dark:border-gray-800">🎬</div>
         <div className="space-y-4 max-w-sm">
-          <h2 className="text-4xl font-black text-white tracking-tighter uppercase italic">Ready to Edit?</h2>
-          <p className="text-gray-500 font-bold">Nenhuma cena selecionada para o laboratório. Escolha sua matéria-prima na galeria.</p>
+          <h2 className="text-4xl font-black text-gray-900 dark:text-white tracking-widest uppercase italic">Editor Vazio</h2>
+          <p className="text-gray-400 font-bold">Escolha um vídeo na galeria para começar.</p>
         </div>
         <Link href="/buscar-cenas">
-          <Button className="px-14 py-8 rounded-4xl font-black text-xl shadow-2xl transform active:scale-95 transition-all text-white" style={{ backgroundColor: branding.primaryColor }}>
-            ABRIR GALERIA 🔍
-          </Button>
+          <Button size="xl" className="shadow-2xl">BUSCAR CENAS 🔍</Button>
         </Link>
       </div>
     );
   }
 
   return (
-    <div className="max-w-[1400px] mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-1000 pb-20 select-none">
+    <div className="max-w-[1400px] mx-auto space-y-8 animate-in fade-in duration-700 pb-20 select-none px-4 lg:px-0">
       
-      {/* RENDER OVERLAY */}
       {isRendering && (
-        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center p-8 bg-black/95 backdrop-blur-3xl animate-in zoom-in duration-500">
-           <div className="w-full max-w-2xl space-y-12 text-center">
-              <div className="relative w-48 h-48 mx-auto">
-                 <div className="absolute inset-0 rounded-full border-8 border-white/5 animate-ping"></div>
-                 <div className="absolute inset-0 rounded-full border-t-8 border-blue-500 animate-spin" style={{ borderTopColor: branding.primaryColor }}></div>
-                 <div className="absolute inset-0 flex items-center justify-center text-5xl font-black text-white">{renderProgress}%</div>
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center p-8 bg-black/90 backdrop-blur-3xl">
+           <div className="w-full max-w-md space-y-10 text-center">
+              <div className="animate-spin w-20 h-20 border-4 border-t-transparent border-blue-500 rounded-full mx-auto"></div>
+              <h2 className="text-4xl font-black text-white tracking-widest uppercase">{renderStatus}</h2>
+              <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+                 <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${renderProgress}%` }}></div>
               </div>
-              <div className="space-y-4">
-                 <h2 className="text-5xl font-black text-white tracking-tighter uppercase italic">{renderStatus}</h2>
-                 <p className="text-gray-400 font-bold tracking-[0.4em] uppercase text-xs">SaaS Professional Render Engine</p>
-              </div>
+              <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">Você será redirecionado em breve...</p>
            </div>
         </div>
       )}
 
-      {/* HEADER Barra Superior */}
-      <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-white dark:bg-gray-900/50 p-6 rounded-4xl border border-gray-100 dark:border-gray-800 shadow-2xl backdrop-blur-2xl">
-        <div className="flex items-center gap-6">
-          <div 
-            className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl shadow-xl animate-pulse"
-            style={{ backgroundColor: `${branding.primaryColor}1a`, color: branding.primaryColor }}
-          >🕹️</div>
+      <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-6 rounded-4xl shadow-xl">
+        <div className="flex items-center gap-5">
+          <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-500 flex items-center justify-center text-2xl font-black shadow-inner">V</div>
           <div>
-            <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter uppercase italic truncate max-w-[300px]">
-               {clips.length > 1 ? `PROJETO: ${clips.length} CENAS` : selectedVideo.title}
+            <h1 className="text-lg font-black text-gray-900 dark:text-white tracking-widest uppercase italic truncate max-w-[250px] md:max-w-md">
+               {selectedVideo.title}
             </h1>
-            <div className="flex items-center gap-3 mt-1">
-               <span className={`w-2 h-2 rounded-full animate-pulse ${saveStatus === 'success' ? 'bg-green-500' : 'bg-blue-500'}`}></span>
-               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-loose">
-                  {saveStatus === "saving" ? "🌩️ Sincronizando..." : `ID: ${selectedVideo.id.substring(0, 8)} | SALVO ÀS ${lastSaved?.toLocaleTimeString() || '--:--'}`}
-               </p>
-            </div>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-0.5">
+               {saveStatus === "saving" ? "Sincronizando..." : `Último salvamento: ${lastSaved?.toLocaleTimeString() || '--:--'}`}
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <Button 
-            variant="outline" 
-            onClick={() => handleSaveProject()}
-            disabled={isSaving}
-            className="px-8 h-16 rounded-2xl font-black text-xs uppercase tracking-widest transition-all hover:bg-gray-50 active:scale-95 border-2 border-gray-100"
-          >
-             {isSaving ? "⏳" : "SALVAR RASCUNHO"}
-          </Button>
-          <Button 
-            onClick={handleGenerateVideo}
-            className="px-10 h-16 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-blue-500/20 text-white active:scale-95 transition-all"
-            style={{ backgroundColor: branding.primaryColor }}
-          >
-             FINALIZAR & EXPORTAR 💎
-          </Button>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" onClick={handleSaveProject} disabled={isSaving}>SALVAR PROJETO</Button>
+          <Button onClick={handleGenerateVideo}>GERAR VÍDEO FINAL 💎</Button>
         </div>
       </header>
 
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-10">
-        
-        {/* PREVIEW AREA (Left) */}
-        <div className="xl:col-span-8 space-y-6">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
+        <div className="xl:col-span-8 flex flex-col gap-6">
            <div 
               ref={videoContainerRef}
-              className={`relative bg-[#050505] rounded-[3rem] shadow-[0_60px_120px_-30px_rgba(0,0,0,0.6)] border-[10px] border-white dark:border-gray-900 overflow-hidden transition-all duration-700 select-none touch-none w-full group`}
-              style={{ aspectRatio: videoConfig.aspectRatio.replace(':', '/'), maxWidth: videoConfig.aspectRatio === '9:16' ? '450px' : '100%', margin: videoConfig.aspectRatio === '9:16' ? '0 auto' : '0' }}
+              className={`relative bg-black rounded-4xl shadow-2xl border-[8px] border-white dark:border-gray-900 overflow-hidden transition-all duration-500 w-full group self-center`}
+              style={{ 
+                aspectRatio: videoConfig.aspectRatio.replace(':', '/'), 
+                maxWidth: videoConfig.aspectRatio === '9:16' ? '400px' : '100%' 
+              }}
               onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-              onPointerLeave={handlePointerUp}
+              onPointerUp={() => setIsDragging(null)}
            >
-              {/* VIDEO BG */}
               <img 
                 src={selectedVideo.thumbnail} 
-                className={`w-full h-full object-cover select-none pointer-events-none transition-all duration-1000 ${finalScreen.showPreview ? "blur-2xl scale-125 opacity-30" : "opacity-80"}`} 
-                style={{
-                  filter: `brightness(${filters.brightness}%) contrast(${filters.contrast}%) saturate(${filters.saturation}%) sepia(${filters.sepia}%) blur(${filters.blur}px)`,
-                  transform: `scale(${videoConfig.zoom / 100})`
-                }}
+                className={`w-full h-full object-cover select-none pointer-events-none transition-all duration-300`} 
+                style={{ transform: `scale(${videoConfig.zoom / 100})` }}
+                alt="preview"
               />
 
-              {/* OVERLAYS: GRID & SAFE AREA */}
-              {!finalScreen.showPreview && videoConfig.showGrid && (
-                <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none animate-in fade-in duration-500">
-                   {[...Array(8)].map((_, i) => ( <div key={i} className="border-[0.5px] border-white/10"></div> ))}
-                </div>
-              )}
-              {!finalScreen.showPreview && videoConfig.showSafeArea && (
-                <div className="absolute inset-[10%] border-2 border-dashed border-white/5 rounded-3xl pointer-events-none">
-                   <span className="absolute top-4 left-4 text-[8px] font-black text-white/20 uppercase tracking-[0.4em]">Safe Area 10%</span>
-                </div>
-              )}
-
-              {/* CONTENT OVERLAYS */}
-              {!finalScreen.showPreview && (
-                 <>
-                    {/* Watermark */}
-                    {watermark.url && (
-                      <div 
-                        onPointerDown={handlePointerDown("watermark")}
-                        className={`absolute cursor-move active:scale-110 transition-all ${isDragging === 'watermark' ? 'ring-4 ring-blue-500/50 ring-offset-8 ring-offset-black rounded-lg scale-110 z-50' : 'z-20'}`}
-                        style={{ left: `${watermark.x}%`, top: `${watermark.y}%`, transform: `translate(-50%, -50%)`, opacity: watermark.opacity / 100, width: `${watermark.size}px` }}
-                      >
-                         <img src={watermark.url} className="w-full h-auto drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)] pointer-events-none" />
-                      </div>
-                    )}
-                    {/* Subtitle */}
-                    <div 
-                      onPointerDown={handlePointerDown("subtitle")}
-                      className={`absolute cursor-move flex justify-center transition-all ${isDragging === 'subtitle' ? 'z-50 scale-105' : 'z-30'}`}
-                      style={{ left: `${subtitle.x}%`, top: `${subtitle.y}%`, transform: `translate(-50%, -50%)`, width: 'max-content', maxWidth: '85%' }}
-                    >
-                       <div 
-                        className={`px-8 py-3 rounded-2xl shadow-2xl select-none  ${
-                          subtitleAnimation === 'pop' ? 'animate-bounce' : 
-                          subtitleAnimation === 'fade' ? 'animate-pulse' : 
-                          subtitleAnimation === 'glow' ? 'shadow-[0_0_30px_white]' : ''
-                        }`}
-                        style={{ 
-                          color: subtitle.color, 
-                          fontSize: `${subtitle.size}px`, 
-                          backgroundColor: subtitle.backgroundColor,
-                          WebkitTextStroke: `${subtitle.outlineWidth}px ${subtitle.outlineColor}`,
-                          fontWeight: subtitle.fontWeight,
-                          fontFamily: subtitle.fontFamily,
-                          textShadow: `0 8px 16px rgba(0,0,0,${subtitle.shadowAlpha})`,
-                          border: subtitle.backgroundColor !== 'transparent' ? '1px solid rgba(255,255,255,0.1)' : 'none'
-                        }}
-                       >
-                         {subtitle.text || "DIGITE ALGO"}
-                       </div>
-                    </div>
-                 </>
-              )}
-
-              {/* FINAL SCREEN PREVIEW */}
-              {finalScreen.showPreview && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/20 backdrop-blur-3xl animate-in zoom-in duration-700">
-                   <div className="relative group">
-                      <div className="absolute -inset-10 bg-white/5 rounded-full blur-3xl animate-pulse"></div>
-                      <img src={finalScreen.url || branding.logo} className="relative w-48 h-48 object-contain drop-shadow-[0_0_80px_rgba(255,255,255,0.1)]" />
-                   </div>
-                   <p className="mt-12 text-white font-black text-xs uppercase tracking-[1em] animate-pulse">Final Screen Preview</p>
+              {watermark.url && (
+                <div 
+                  className="absolute cursor-move select-none"
+                  onPointerDown={(e) => { e.preventDefault(); setIsDragging("watermark"); }}
+                  style={{ left: `${watermark.x}%`, top: `${watermark.y}%`, transform: `translate(-50%, -50%)`, width: `${watermark.size}px`, opacity: watermark.opacity / 100 }}
+                >
+                   <img src={watermark.url} className="w-full drop-shadow-xl pointer-events-none" />
                 </div>
               )}
 
-              {/* VIDEO CONTROLS OVERLAY */}
-              <div className="absolute bottom-10 left-1/2 -translate-x-1/2 bg-black/40 backdrop-blur-3xl border border-white/10 px-8 py-4 rounded-full flex items-center gap-6 opacity-0 group-hover:opacity-100 transition-all duration-500 translate-y-4 group-hover:translate-y-0">
-                  <button className="text-white text-xl hover:scale-125 transition-transform">⏪</button>
-                  <button className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-black text-xl pl-1 shadow-2xl hover:scale-110 active:scale-95 transition-all">▶</button>
-                  <button className="text-white text-xl hover:scale-125 transition-transform">⏩</button>
-                  <div className="w-[0.5px] h-6 bg-white/20 mx-2"></div>
-                  <span className="text-[10px] font-black text-white/50 tracking-widest uppercase">00:0{videoConfig.startTime} / 00:{videoConfig.endTime}</span>
-                  <button className="text-white text-xl hover:scale-110" onClick={() => setVideoConfig(v => ({...v, isMuted: !v.isMuted}))}>{videoConfig.isMuted ? '🔇' : '🔊'}</button>
-              </div>
-           </div>
-
-           {/* Video Timeline Professional */}
-           <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-6 rounded-[2rem] shadow-xl space-y-6">
-              <div className="flex items-center justify-between px-2">
-                 <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-blue-500"></span> 
-                    Multi-Scene Timeline
-                 </h4>
-                 <div className="flex gap-4">
-                    <span className="text-[10px] font-black text-gray-400 uppercase">{clips.length} Cenas Total</span>
+              <div 
+                className="absolute cursor-move select-none flex justify-center"
+                onPointerDown={(e) => { e.preventDefault(); setIsDragging("subtitle"); }}
+                style={{ left: `${subtitle.x}%`, top: `${subtitle.y}%`, transform: `translate(-50%, -50%)`, width: 'max-content', maxWidth: '90%' }}
+              >
+                 <div className="px-6 py-2 rounded-xl text-center shadow-2xl font-black italic uppercase tracking-tighter"
+                   style={{ color: subtitle.color, fontSize: `${subtitle.size}px`, textShadow: '2px 2px 0px rgba(0,0,0,0.5)' }}
+                 >
+                   {subtitle.text}
                  </div>
               </div>
-              
-              <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+           </div>
+
+           <div className="bg-white dark:bg-gray-900 p-6 rounded-4xl border border-gray-100 dark:border-gray-800 shadow-lg">
+              <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-none">
                  {clips.map((clip, idx) => (
                     <div 
-                      key={`${clip.id}-${idx}`}
-                      onClick={() => setActiveClipIndex(idx)}
-                      className={`relative flex-shrink-0 w-40 aspect-video rounded-2xl overflow-hidden border-4 cursor-pointer transition-all ${activeClipIndex === idx ? 'border-blue-500 scale-105 shadow-2xl' : 'border-transparent opacity-60 hover:opacity-100'}`}
-                      style={activeClipIndex === idx ? { borderColor: branding.primaryColor } : {}}
+                       key={idx}
+                       onClick={() => setActiveClipIndex(idx)}
+                       className={`relative flex-shrink-0 w-32 aspect-video rounded-xl overflow-hidden border-2 transition-all ${activeClipIndex === idx ? 'border-blue-500 shadow-lg scale-105' : 'border-transparent opacity-60'}`}
                     >
                        <img src={clip.thumbnail} className="w-full h-full object-cover" />
-                       <div className="absolute inset-x-0 bottom-0 bg-black/60 p-2 text-center">
-                          <span className="text-[8px] font-black text-white uppercase italic">Cena {idx + 1}</span>
-                       </div>
                     </div>
                  ))}
-                 <Link href="/buscar-cenas" className="flex-shrink-0 w-40 aspect-video rounded-2xl bg-gray-100 dark:bg-black border-2 border-dashed border-gray-300 dark:border-gray-800 flex flex-col items-center justify-center gap-2 hover:bg-gray-200 transition-all">
-                    <span className="text-2xl">➕</span>
-                    <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Add Cena</span>
-                 </Link>
               </div>
-
-              <div className="relative h-12 bg-gray-100 dark:bg-black p-1 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-800 flex items-center gap-1 overflow-hidden group/timeline">
-                  {[...Array(60)].map((_, i) => (
-                    <div 
-                      key={i} 
-                      className="flex-1 bg-gray-300 dark:bg-gray-800 rounded-full transition-all duration-500 group-hover/timeline:bg-blue-500/40" 
-                      style={{ 
-                        height: `${Math.sin(i * 0.5) * 30 + 50}%`,
-                        opacity: i % 3 === 0 ? 0.3 : 1
-                      }} 
-                    ></div>
-                  ))}
-                  <div className="absolute top-0 left-[35%] bottom-0 w-0.5 bg-red-500 shadow-[0_0_10px_red] z-10 animate-pulse">
-                     <div className="absolute top-0 left-1/2 -translate-x-1/2 w-2 h-2 bg-red-500 rounded-full"></div>
-                  </div>
-               </div>
            </div>
         </div>
 
-        {/* CONTROLS SIDEBAR (Right) */}
-        <div className="xl:col-span-4 space-y-8 h-full">
-           <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[2.5rem] shadow-2xl flex flex-col h-full overflow-hidden">
+        <div className="xl:col-span-4 space-y-6">
+           <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-4xl shadow-xl p-8 space-y-8 min-h-[600px]">
               
-              {/* TABS HEADER */}
-              <div className="flex border-b border-gray-50 dark:border-gray-800 p-2">
-                 {([
-                   { id: "video", icon: "🎬", label: "Video" },
-                   { id: "subtitle", icon: "💬", label: "Texto" },
-                   { id: "audio", icon: "🎵", label: "Áudio" },
-                   { id: "watermark", icon: "🏷️", label: "Logo" },
-                   { id: "final", icon: "✨", label: "Final" }
-                 ] as const).map(tab => (
+              <div className="flex gap-1 bg-gray-50 dark:bg-black/50 p-1.5 rounded-2xl border border-gray-100 dark:border-gray-800">
+                 {(["video", "subtitle", "audio", "watermark"] as const).map(sec => (
                    <button 
-                    key={tab.id}
-                    onClick={() => setActiveSection(tab.id as EditorSection)}
-                    className={`flex-1 py-4 px-2 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all ${activeSection === tab.id ? 'bg-gray-100 dark:bg-black text-blue-500 shadow-inner' : 'text-gray-400 hover:text-gray-600'}`}
-                    style={activeSection === tab.id ? { color: branding.primaryColor } : {}}
-                   >
-                      <span className="text-xl">{tab.icon}</span>
-                      <span className="text-[8px] font-black uppercase tracking-widest">{tab.label}</span>
-                   </button>
+                    key={sec}
+                    onClick={() => setActiveSection(sec)}
+                    className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${activeSection === sec ? 'bg-white dark:bg-gray-800 text-blue-500 shadow-md' : 'text-gray-400'}`}
+                   >{sec}</button>
                  ))}
               </div>
 
-              {/* TAB CONTENT SCROLLABLE AREA */}
-              <div className="p-8 space-y-10 overflow-y-auto scrollbar-hide max-h-[650px] flex-1">
-                 
-                 {/* SECTION: VIDEO */}
-                 {activeSection === "video" && (
-                   <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
-                      <SectionTitle title="Configurações de Video" icon="⚙️" />
-                      
-                      <div className="space-y-4">
-                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Estilos de Vídeo Inteligente</label>
-                          <div className="grid grid-cols-3 gap-2">
-                             {(["motivational", "cinema", "viral"] as const).map(s => (
-                               <button 
-                                 key={s}
-                                 onClick={() => applyStylePreset(s)}
-                                 className={`py-6 rounded-2xl text-[8px] font-black transition-all uppercase tracking-widest border-2 ${activeStyle === s ? '' : 'border-gray-100 dark:border-gray-800 text-gray-400 hover:border-gray-300'}`}
-                                 onMouseEnter={(e) => {
-                                   if (activeStyle !== s) e.currentTarget.style.borderColor = branding.primaryColor;
-                                 }}
-                                 onMouseLeave={(e) => {
-                                   if (activeStyle !== s) e.currentTarget.style.borderColor = '';
-                                 }}
-                                 style={activeStyle === s ? { borderColor: branding.primaryColor, color: branding.primaryColor, backgroundColor: `${branding.primaryColor}1a` } : {}}
-                               >
-                                 {s === "motivational" ? "🚀 Motiv" : s === "cinema" ? "🎬 Cine" : "🔥 Viral"}
-                               </button>
-                             ))}
-                          </div>
-                       </div>
-
+              <div className="space-y-8 animate-in slide-in-from-right-2 duration-300">
+                  {activeSection === "video" && (
+                    <div className="space-y-6">
                        <div className="space-y-4">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Formato / Aspect Ratio</label>
-                          <div className="grid grid-cols-3 gap-3 p-2 bg-gray-100 dark:bg-black rounded-3xl">
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Formato</label>
+                          <div className="grid grid-cols-3 gap-2">
                              {(["16:9", "9:16", "1:1"] as AspectRatio[]).map(r => (
                                <button 
-                                 key={r}
-                                 onClick={() => setVideoConfig(v => ({...v, aspectRatio: r}))}
-                                 className={`py-4 rounded-2xl text-[10px] font-black transition-all ${videoConfig.aspectRatio === r ? 'bg-white dark:bg-gray-800 text-blue-500 shadow-xl' : 'text-gray-400'}`}
-                                 style={videoConfig.aspectRatio === r ? { color: branding.primaryColor } : {}}
-                               > {r} </button>
+                                key={r} onClick={() => setVideoConfig(v => ({...v, aspectRatio: r}))}
+                                className={`py-3 rounded-xl border-2 text-[10px] font-black transition-all ${videoConfig.aspectRatio === r ? 'border-blue-500 bg-blue-500/10 text-blue-500' : 'border-gray-100 dark:border-gray-800 text-gray-400'}`}
+                               >{r}</button>
                              ))}
                           </div>
                        </div>
+                       <Button variant="outline" className="w-full" onClick={() => setVideoConfig(v => ({...v, showGrid: !v.showGrid}))}>GRADE {videoConfig.showGrid ? 'LIGADA' : 'DESLIGADA'}</Button>
+                    </div>
+                  )}
 
-                      <div className="space-y-6 bg-gray-50 dark:bg-black/40 p-6 rounded-3xl border border-gray-100 dark:border-gray-800">
-                          <div className="flex items-center justify-between">
-                             <span className="text-[10px] font-black text-gray-500 uppercase">Zoom Digital (Scale)</span>
-                             <span className="text-xs font-black text-blue-500">{videoConfig.zoom}%</span>
-                          </div>
-                          <input 
-                           type="range" min="100" max="250" step="1" 
-                           value={videoConfig.zoom}
-                           onChange={(e) => setVideoConfig(v => ({...v, zoom: parseInt(e.target.value)}))}
-                           className="w-full h-1.5 bg-gray-200 dark:bg-gray-800 rounded-full appearance-none accent-primary"
-                           style={{ accentColor: branding.primaryColor }}
-                          />
-                          <div className="flex items-center justify-between">
-                             <span className="text-[10px] font-black text-gray-500 uppercase">Playback Speed</span>
-                             <span className="text-xs font-black text-blue-500">{videoConfig.playbackRate}x</span>
-                          </div>
-                          <input 
-                           type="range" min="0.5" max="2" step="0.1" 
-                           value={videoConfig.playbackRate}
-                           onChange={(e) => setVideoConfig(v => ({...v, playbackRate: parseFloat(e.target.value)}))}
-                           className="w-full h-1.5 bg-gray-200 dark:bg-gray-800 rounded-full appearance-none accent-primary"
-                           style={{ accentColor: branding.primaryColor }}
-                          />
-                         <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-black text-gray-500 uppercase">Volume</span>
-                            <span className="text-xs font-black text-blue-500">{videoConfig.volume}%</span>
-                         </div>
-                         <input 
-                          type="range" min="0" max="100" 
-                          value={videoConfig.volume}
-                          onChange={(e) => setVideoConfig(v => ({...v, volume: parseInt(e.target.value)}))}
-                          className="w-full h-1.5 bg-gray-200 dark:bg-gray-800 rounded-full appearance-none accent-primary"
-                          style={{ accentColor: branding.primaryColor }}
-                         />
-                      </div>
-
-                      <div className="space-y-4">
-                         <ToggleItem active={videoConfig.showGrid} onClick={() => setVideoConfig(v => ({...v, showGrid: !v.showGrid}))} label="Grade de Alinhamento" />
-                         <ToggleItem active={videoConfig.showSafeArea} onClick={() => setVideoConfig(v => ({...v, showSafeArea: !v.showSafeArea}))} label="Margem de Segurança" />
-                      </div>
-
-                      <div className="pt-4 border-t border-gray-100 dark:border-gray-800 space-y-6">
-                            <SectionTitle title="Ajustes de Cor" icon="🎨" />
-                            <div className="space-y-6 bg-gray-50 dark:bg-black/40 p-6 rounded-3xl">
-                                {[
-                                    { label: "Brightness", key: "brightness", min: 50, max: 200 },
-                                    { label: "Contrast", key: "contrast", min: 50, max: 200 },
-                                    { label: "Saturation", key: "saturation", min: 0, max: 200 },
-                                ] .map(f => (
-                                    <div key={f.key} className="space-y-3">
-                                        <div className="flex justify-between items-center text-[8px] font-black uppercase text-gray-500">
-                                            <span>{f.label}</span>
-                                            <span style={{ color: branding.primaryColor }}>{(filters as any)[f.key]}%</span>
-                                        </div>
-                                        <input 
-                                            type="range" min={f.min} max={f.max} 
-                                            value={(filters as any)[f.key]}
-                                            onChange={(e) => setFilters(prev => ({...prev, [f.key]: parseInt(e.target.value)}))}
-                                            className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full appearance-none accent-primary"
-                                            style={{ accentColor: branding.primaryColor }}
-                                        />
-                                    </div>
-                                ))}
-                            </div>
+                  {activeSection === "subtitle" && (
+                    <div className="space-y-6">
+                       <div className="space-y-3">
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Conteúdo</label>
+                          <Input value={subtitle.text} onChange={(e) => setSubtitle(s => ({...s, text: e.target.value.toUpperCase()}))} className="h-14 font-black italic" />
                        </div>
-                   </div>
-                 )}
+                    </div>
+                  )}
 
-                 {/* SECTION: SUBTITLE */}
-                 {activeSection === "subtitle" && (
-                   <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
-                      <SectionTitle title="Legendas Avançadas" icon="📝" />
-                      <div className="space-y-4">
-                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Texto da Cena</label>
-                         <Input 
-                          value={subtitle.text} 
-                          onChange={(e) => setSubtitle(s => ({ ...s, text: e.target.value.toUpperCase() }))} 
-                          className="h-16 text-lg rounded-2xl bg-gray-50 dark:bg-black/50 border-gray-100 dark:border-gray-800 font-bold px-6"
-                         />
-                      </div>
+                  {activeSection === "watermark" && (
+                     <div className="space-y-6">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">URL da Marca d'água</label>
+                        <Input value={watermark.url} onChange={(e) => setWatermark(w => ({...w, url: e.target.value}))} placeholder="https://..." className="h-14" />
+                     </div>
+                  )}
 
-                      <div className="space-y-4">
-                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Estilos Rápidos</label>
-                         <div className="grid grid-cols-2 gap-3">
-                            {["cinema", "tiktok", "minimalista", "destaque"].map(p => (
-                              <button 
-                                key={p}
-                                onClick={() => applySubtitlePreset(p)}
-                                className={`py-4 rounded-2xl text-[10px] font-black border-2 transition-all uppercase tracking-widest ${subtitle.preset === p ? 'border-blue-500 bg-blue-500/10 text-blue-500' : 'border-gray-100 dark:border-gray-800 text-gray-400 hover:border-gray-300'}`}
-                                style={subtitle.preset === p ? { borderColor: branding.primaryColor, color: branding.primaryColor, backgroundColor: `${branding.primaryColor}1a` } : {}}
-                              > {p} </button>
-                            ))}
-                         </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-6 bg-gray-50 dark:bg-black/40 p-6 rounded-3xl border border-gray-100 dark:border-gray-800">
-                         <div className="space-y-3">
-                            <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Cor</label>
-                            <input type="color" value={subtitle.color} onChange={(e) => setSubtitle(s => ({...s, color: e.target.value}))} className="w-full h-10 rounded-lg cursor-pointer bg-white dark:bg-gray-800 border-none" />
-                         </div>
-                         <div className="space-y-3">
-                            <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Fundo</label>
-                            <input type="color" value={subtitle.backgroundColor === 'transparent' ? '#000000' : subtitle.backgroundColor} onChange={(e) => setSubtitle(s => ({...s, backgroundColor: e.target.value}))} className="w-full h-10 rounded-lg cursor-pointer bg-white dark:bg-gray-800 border-none" />
-                         </div>
-                         <div className="col-span-2 space-y-4 pt-2">
-                           <div className="flex justify-between items-center">
-                              <span className="text-[10px] font-black text-gray-500 uppercase">Tamanho</span>
-                              <span className="text-xs font-black text-blue-500">{subtitle.size}px</span>
-                           </div>
-                           <input 
-                            type="range" min="12" max="100" 
-                            value={subtitle.size}
-                            onChange={(e) => setSubtitle(s => ({...s, size: parseInt(e.target.value)}))}
-                            className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full appearance-none accent-primary"
-                            style={{ accentColor: branding.primaryColor }}
-                           />
-                         </div>
-                      </div>
-
-                      <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800">
-                          <SectionTitle title="Animação SaaS" icon="🎭" />
-                          <div className="grid grid-cols-2 gap-3">
-                             {(["none", "pop", "fade", "glow"] as const).map(a => (
-                               <button 
-                                 key={a}
-                                 onClick={() => setSubtitleAnimation(a)}
-                                 className={`py-4 rounded-2xl text-[10px] font-black transition-all uppercase tracking-widest border-2 ${subtitleAnimation === a ? 'border-blue-500 bg-blue-500/10 text-blue-500' : 'border-gray-100 dark:border-gray-800 text-gray-400 hover:border-gray-300'}`}
-                                 style={subtitleAnimation === a ? { borderColor: branding.primaryColor, color: branding.primaryColor, backgroundColor: `${branding.primaryColor}1a` } : {}}
-                               > {a} </button>
-                             ))}
-                          </div>
-                      </div>
-                   </div>
-                 )}
-
-                 {/* SECTION: AUDIO */}
-                 {activeSection === "audio" && (
-                   <div className="space-y-10 animate-in slide-in-from-right-4 duration-500 pb-10">
-                      <div className="flex items-center justify-between">
-                         <SectionTitle title="Laboratório de Áudio" icon="🎧" />
-                         <Button 
-                          onClick={handleAISuggestion}
-                          disabled={isAnalyzingAudio}
-                          className="h-10 px-4 rounded-xl font-black text-[8px] uppercase tracking-widest text-white shadow-lg animate-pulse"
-                          style={{ backgroundColor: branding.primaryColor }}
-                         >
-                            {isAnalyzingAudio ? "⏳ Analisando..." : "✨ Sugerir para esta cena"}
-                         </Button>
-                      </div>
-
-                      {/* BLOCO 1: PRESETS DE ÁUDIO */}
-                      <div className="space-y-4">
-                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Presets de Áudio Profissional</label>
-                         <div className="grid grid-cols-5 gap-2">
-                            {(["cinema", "motivational", "triste", "viral", "storytelling"] as const).map(p => (
-                              <button 
-                                key={p}
-                                onClick={() => applyAudioPreset(p)}
-                                className={`flex flex-col items-center justify-center py-4 rounded-2xl text-[8px] font-black border-2 transition-all uppercase tracking-widest ${(audioConfig as any).activePreset === p ? 'border-primary bg-primary/10 text-primary' : 'border-gray-100 dark:border-gray-800 text-gray-400 hover:border-gray-300'}`}
-                                style={(audioConfig as any).activePreset === p ? { borderColor: branding.primaryColor, color: branding.primaryColor, backgroundColor: `${branding.primaryColor}1a` } : {}}
-                              > 
-                                <span className="mb-1 text-base">{p === "cinema" ? "🎬" : p === "motivational" ? "🚀" : p === "triste" ? "🎻" : p === "viral" ? "🔥" : "📖"}</span>
-                                {p.substring(0, 4)} 
-                              </button>
-                            ))}
-                         </div>
-                      </div>
-                      
-                      {/* BLOCO 2: FONTE & MIXAGEM */}
-                      <div className="space-y-6">
-                         <div className="flex items-center justify-between px-1">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-loose">Mixagem Avançada</label>
-                            <button 
-                              onClick={handleAutoAdjustAudio}
-                              className="text-[8px] font-black text-blue-500 uppercase tracking-tighter hover:underline px-2 py-1 bg-blue-500/5 rounded-lg"
-                            >⚡ Ajustar Automaticamente</button>
-                         </div>
-                         
-                         <div className="space-y-6 bg-gray-50 dark:bg-black/40 p-6 rounded-3xl border border-gray-100 dark:border-gray-800">
-                            <div className="grid grid-cols-2 gap-3">
-                               <button 
-                                onClick={() => setAudioConfig(a => ({...a, originalMuted: !a.originalMuted}))}
-                                className={`py-4 rounded-xl border-2 text-[8px] font-black uppercase transition-all ${!audioConfig.originalMuted ? 'bg-blue-500/10 border-blue-500 text-blue-500' : 'bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 text-gray-400'}`}
-                                style={!audioConfig.originalMuted ? { borderColor: branding.primaryColor, color: branding.primaryColor, backgroundColor: `${branding.primaryColor}1a` } : {}}
-                               >Áudio Original</button>
-                               <button 
-                                onClick={() => setAudioConfig(a => ({...a, originalMuted: true, musicVolume: 100}))}
-                                className={`py-4 rounded-xl border-2 text-[8px] font-black uppercase transition-all ${audioConfig.originalMuted ? 'bg-blue-500/10 border-blue-500 text-blue-500' : 'bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 text-gray-400'}`}
-                                style={audioConfig.originalMuted ? { borderColor: branding.primaryColor, color: branding.primaryColor, backgroundColor: `${branding.primaryColor}1a` } : {}}
-                               >Apenas Música</button>
-                            </div>
-
-                            <div className="space-y-6 pt-4 border-t border-gray-100 dark:border-gray-800">
-                               <div className="space-y-3">
-                                  <div className="flex justify-between items-center text-[8px] font-black uppercase text-gray-500">
-                                     <span>Volume Original</span>
-                                     <span style={{ color: branding.primaryColor }}>{audioConfig.originalVolume}%</span>
-                                  </div>
-                                  <input 
-                                    type="range" min="0" max="100" 
-                                    value={audioConfig.originalVolume}
-                                    onChange={(e) => setAudioConfig(a => ({...a, originalVolume: parseInt(e.target.value)}))}
-                                    className="w-full h-1.5 bg-gray-200 dark:bg-gray-800 rounded-full appearance-none accent-primary"
-                                    style={{ accentColor: branding.primaryColor, opacity: audioConfig.originalMuted ? 0.3 : 1 }}
-                                    disabled={audioConfig.originalMuted}
-                                  />
-                               </div>
-                               <div className="space-y-3">
-                                  <div className="flex justify-between items-center text-[8px] font-black uppercase text-gray-500">
-                                     <span>Volume da Música</span>
-                                     <span style={{ color: branding.primaryColor }}>{audioConfig.musicVolume}%</span>
-                                  </div>
-                                  <input 
-                                    type="range" min="0" max="100" 
-                                    value={audioConfig.musicVolume}
-                                    onChange={(e) => setAudioConfig(a => ({...a, musicVolume: parseInt(e.target.value)}))}
-                                    className="w-full h-1.5 bg-gray-200 dark:bg-gray-800 rounded-full appearance-none accent-primary"
-                                    style={{ accentColor: branding.primaryColor, opacity: !audioConfig.musicUrl ? 0.3 : 1 }}
-                                    disabled={!audioConfig.musicUrl}
-                                  />
-                               </div>
-                            </div>
-                         </div>
-
-                         {/* ALERTA DE CONFLITO */}
-                         {audioConfig.musicUrl && !audioConfig.originalMuted && (
-                             <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-2xl space-y-3 animate-in slide-in-from-top-2">
-                                <div className="flex items-center gap-3">
-                                   <span className="text-lg">🔊</span>
-                                   <p className="text-[9px] font-black text-orange-600 dark:text-orange-400 uppercase tracking-widest italic tracking-[0.2em]">O vídeo possui áudio original</p>
-                                </div>
-                                <div className="flex gap-2">
-                                   <button 
-                                    onClick={() => setAudioConfig(a => ({...a, mixMode: "mix", originalVolume: 40}))}
-                                    className="px-3 py-1.5 border border-orange-500/30 text-orange-600 dark:text-orange-400 text-[8px] font-black rounded-lg hover:bg-orange-500/10 uppercase"
-                                   >Misturar</button>
-                                   <button 
-                                    onClick={() => setAudioConfig(a => ({...a, originalVolume: 20}))}
-                                    className="px-3 py-1.5 border border-orange-500/30 text-orange-600 dark:text-orange-400 text-[8px] font-black rounded-lg hover:bg-orange-500/10 uppercase"
-                                   >Reduzir</button>
-                                   <button 
-                                    onClick={() => setAudioConfig(a => ({...a, originalMuted: true}))}
-                                    className="px-3 py-1.5 bg-orange-500 text-white text-[8px] font-black rounded-lg hover:bg-orange-600 uppercase"
-                                   >Remover</button>
-                                </div>
-                             </div>
-                           )}
-                      </div>
-
-                      {/* BLOCO 3: BUSCA & CATEGORIAS */}
-                      <div className="space-y-6">
-                         <div className="space-y-4">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Busca de Música</label>
-                            <div className="relative group">
-                               <Input 
-                                 placeholder="Estilo, clima ou instrumento..." 
-                                 value={musicSearchQuery}
-                                 onChange={(e) => setMusicSearchQuery(e.target.value)}
-                                 className="h-14 rounded-2xl bg-gray-50 dark:bg-black/50 border-gray-100 dark:border-gray-800 font-bold px-6 pl-12"
-                               />
-                               <span className="absolute left-5 top-1/2 -translate-y-1/2 opacity-30">🔍</span>
-                            </div>
-                         </div>
-
-                         <div className="flex flex-wrap gap-2">
-                            {["Motivacional", "Triste", "Suspense", "Épico", "Lo-Fi", "Romântico"].map(style => (
-                              <button 
-                                key={style}
-                                onClick={() => setMusicSearchQuery(style)}
-                                className={`px-4 py-2 rounded-xl text-[8px] font-black uppercase italic tracking-widest transition-all ${musicSearchQuery === style ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'bg-gray-100 dark:bg-gray-800 text-gray-400 hover:bg-gray-200'}`}
-                                style={musicSearchQuery === style ? { backgroundColor: branding.primaryColor } : {}}
-                              > {style} </button>
-                            ))}
-                         </div>
-
-                         <div className="space-y-3">
-                            <div className="grid grid-cols-1 gap-3 max-h-[250px] overflow-y-auto scrollbar-hide pr-1">
-                               {musicSuggestions.filter(m => !musicSearchQuery || m.style.includes(musicSearchQuery) || m.name.toLowerCase().includes(musicSearchQuery.toLowerCase())).map(music => (
+                  {activeSection === "audio" && (
+                     <div className="space-y-6">
+                        <div className="space-y-4">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Modo de Áudio</label>
+                            <div className="grid grid-cols-3 gap-2">
+                               {(["keep", "remove", "mix"] as const).map(m => (
                                  <button 
-                                   key={music.id}
-                                   onClick={() => setAudioConfig(a => ({...a, musicUrl: `url-${music.id}`, musicName: music.name, musicStyle: music.style}))}
-                                   className={`flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-left ${audioConfig.musicName === music.name ? 'bg-blue-500/10 border-primary shadow-lg' : 'bg-white dark:bg-gray-900 border-gray-50 dark:border-gray-800 hover:border-gray-200'}`}
-                                   style={audioConfig.musicName === music.name ? { borderColor: branding.primaryColor, backgroundColor: `${branding.primaryColor}0d` } : {}}
-                                 >
-                                    <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-black flex items-center justify-center text-lg">
-                                       {audioConfig.musicName === music.name ? "⏸️" : "▶️"}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                       <h5 className="text-[10px] font-black text-gray-900 dark:text-white uppercase truncate">{music.name}</h5>
-                                       <div className="flex items-center gap-2 mt-0.5">
-                                          <span className="text-[8px] font-bold text-blue-500 uppercase">{music.style}</span>
-                                          <span className="text-[8px] font-bold text-gray-400 uppercase">• {music.duration}</span>
-                                       </div>
-                                    </div>
-                                    {audioConfig.musicName === music.name && <span className="text-blue-500 text-xs">✓</span>}
-                                 </button>
+                                  key={m} onClick={() => setAudioConfig(a => ({...a, mixMode: m}))}
+                                  className={`py-3 rounded-xl border-2 text-[10px] font-black uppercase transition-all ${audioConfig.mixMode === m ? 'border-blue-500 bg-blue-500/10 text-blue-500' : 'border-gray-100 dark:border-gray-800 text-gray-400'}`}
+                                 >{m}</button>
                                ))}
                             </div>
-                         </div>
-                      </div>
-
-                      {/* BLOCO 4: EFEITOS */}
-                      {audioConfig.musicUrl && (
-                        <div className="space-y-6 pt-6 border-t border-gray-100 dark:border-gray-800 animate-in fade-in slide-in-from-bottom-4">
-                           <SectionTitle title="Efeitos" icon="🪄" />
-                           <div className="grid grid-cols-2 gap-4">
-                              <button 
-                                onClick={() => setAudioConfig(a => ({...a, fadeIn: !a.fadeIn}))}
-                                className={`py-4 rounded-2xl border-2 text-[8px] font-black uppercase transition-all ${audioConfig.fadeIn ? 'bg-blue-500/10 border-blue-500 text-blue-500' : 'bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 text-gray-400 hover:border-gray-200'}`}
-                                style={audioConfig.fadeIn ? { borderColor: branding.primaryColor, color: branding.primaryColor, backgroundColor: `${branding.primaryColor}1a` } : {}}
-                              >+ Fade In</button>
-                              <button 
-                                onClick={() => setAudioConfig(a => ({...a, fadeOut: !a.fadeOut}))}
-                                className={`py-4 rounded-2xl border-2 text-[8px] font-black uppercase transition-all ${audioConfig.fadeOut ? 'bg-blue-500/10 border-blue-500 text-blue-500' : 'bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 text-gray-400 hover:border-gray-200'}`}
-                                style={audioConfig.fadeOut ? { borderColor: branding.primaryColor, color: branding.primaryColor, backgroundColor: `${branding.primaryColor}1a` } : {}}
-                              >- Fade Out</button>
-                           </div>
                         </div>
-                      )}
-                   </div>
-                 )}
-
-                 {/* SECTION: WATERMARK */}
-                 {activeSection === "watermark" && (
-                   <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
-                      <SectionTitle title="Marca d'água Profissional" icon="🛡️" />
-                      
-                      <div className="space-y-6">
-                        <label className="group relative block w-full aspect-square md:aspect-[4/3] bg-gray-100 dark:bg-black rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-800 flex flex-col items-center justify-center p-8 text-center gap-4 cursor-pointer hover:border-blue-500/50 transition-all overflow-hidden">
-                           <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload("watermark")} />
-                           {watermark.url ? (
-                               <img src={watermark.url} className="w-full h-full object-contain p-4 transition-transform group-hover:scale-105" />
-                           ) : (
-                               <>
-                                   <span className="text-4xl group-hover:scale-125 transition-transform">📁</span>
-                                   <div className="space-y-1">
-                                      <p className="text-xs font-black text-gray-500 uppercase tracking-widest">Upload Custom Logo</p>
-                                      <p className="text-[8px] font-bold text-gray-400 uppercase tracking-tighter">PNG, SVG (Max 2MB)</p>
-                                   </div>
-                               </>
-                           )}
-                        </label>
-                        
-                        <div className="space-y-8 bg-gray-50 dark:bg-black/40 p-6 rounded-3xl border border-gray-100 dark:border-gray-800">
-                           <div className="space-y-4">
-                              <div className="flex justify-between items-center">
-                                 <span className="text-[10px] font-black text-gray-500 uppercase">Opacity</span>
-                                 <span className="text-xs font-black text-blue-500">{watermark.opacity}%</span>
-                              </div>
-                              <input 
-                                type="range" min="10" max="100" 
-                                value={watermark.opacity}
-                                onChange={(e) => setWatermark(w => ({...w, opacity: parseInt(e.target.value)}))}
-                                className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full appearance-none accent-primary"
-                                style={{ accentColor: branding.primaryColor }}
-                              />
-                           </div>
-                           <div className="space-y-4">
-                              <div className="flex justify-between items-center">
-                                 <span className="text-[10px] font-black text-gray-500 uppercase">Logo Size</span>
-                                 <span className="text-xs font-black text-blue-500">{watermark.size}px</span>
-                              </div>
-                              <input 
-                                type="range" min="30" max="300" 
-                                value={watermark.size}
-                                onChange={(e) => setWatermark(w => ({...w, size: parseInt(e.target.value)}))}
-                                className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full appearance-none accent-primary"
-                                style={{ accentColor: branding.primaryColor }}
-                              />
-                           </div>
-                        </div>
-                      </div>
-                   </div>
-                 )}
-
-                 {/* SECTION: FINAL SCREEN */}
-                 {activeSection === "final" && (
-                   <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
-                      <SectionTitle title="Encerramento & Logo" icon="🏁" />
-                      
-                      <label className="relative group w-full h-40 bg-gray-100 dark:bg-black rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-800 flex flex-col items-center justify-center gap-4 hover:border-blue-500/50 transition-all cursor-pointer overflow-hidden">
-                         <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload("final-screen")} />
-                         {finalScreen.url ? (
-                            <img src={finalScreen.url} className="w-full h-full object-contain p-4 transition-transform group-hover:scale-105" />
-                         ) : (
-                            <>
-                                <span className="text-3xl">📤</span>
-                                <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Logo Final Screen</span>
-                            </>
-                         )}
-                       </label>
-
-                      <div className="space-y-6 bg-gray-50 dark:bg-black/40 p-6 rounded-3xl border border-gray-100 dark:border-gray-800">
-                        <div className="space-y-4">
-                           <div className="flex justify-between items-center">
-                              <span className="text-[10px] font-black text-gray-500 uppercase">Duração (S)</span>
-                              <span className="text-xs font-black text-blue-500">{finalScreen.duration}s</span>
-                           </div>
-                           <input 
-                            type="range" min="1" max="10" 
-                            value={finalScreen.duration}
-                            onChange={(e) => setFinalScreen(f => ({...f, duration: parseInt(e.target.value)}))}
-                            className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full appearance-none accent-primary"
-                            style={{ accentColor: branding.primaryColor }}
-                           />
-                        </div>
-                      </div>
-
-                      <div className="pt-4">
-                        <button 
-                          onClick={() => setFinalScreen(f => ({...f, showPreview: !f.showPreview}))}
-                          className={`w-full py-6 rounded-3xl font-black text-xs uppercase tracking-[0.2em] transition-all border-2 ${finalScreen.showPreview ? 'bg-blue-600 border-blue-600 text-white shadow-[0_20px_40px_rgba(37,99,235,0.4)]' : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-400 hover:border-gray-300'}`}
-                          style={finalScreen.showPreview ? { backgroundColor: branding.primaryColor, borderColor: branding.primaryColor } : {}}
-                        >
-                          {finalScreen.showPreview ? "FECHAR PREVIEW FINAL" : "SIMULAR TELA FINAL"}
-                        </button>
-                      </div>
-                   </div>
-                  )}
-               </div>
-            </div>
-         </div>
-      </div>
-
-      {/* SUCCESS MODAL */}
-      {showSuccessModal && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md animate-in fade-in duration-500">
-          <div className="bg-white dark:bg-gray-900 w-full max-w-xl rounded-[3rem] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.5)] border border-gray-100 dark:border-gray-800 overflow-hidden animate-in zoom-in-95 duration-500">
-             <div className="relative h-48 bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center overflow-hidden" style={{ backgroundImage: `linear-gradient(135deg, ${branding.primaryColor}, ${branding.secondaryColor})` }}>
-                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
-                <div className="relative z-10 w-24 h-24 bg-white rounded-full flex items-center justify-center text-5xl shadow-2xl animate-bounce">🎬</div>
-                <button onClick={() => setShowSuccessModal(false)} className="absolute top-6 right-6 w-10 h-10 bg-black/20 hover:bg-black/40 text-white rounded-full flex items-center justify-center transition-all">✕</button>
-             </div>
-             <div className="p-10 space-y-8 text-center">
-                <div className="space-y-2">
-                   <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter uppercase italic">Cena Finalizada!</h2>
-                   <p className="text-gray-500 font-bold">Sua produção SaaS de alta performance está pronta para o mundo.</p>
-                </div>
-                
-                <div className="grid grid-cols-3 gap-4">
-                   {[
-                      { icon: "📱", label: "TikTok" },
-                      { icon: "📸", label: "Reels" },
-                      { icon: "📺", label: "Shorts" }
-                   ].map(soc => (
-                     <div key={soc.label} className="bg-gray-50 dark:bg-black p-4 rounded-2xl border border-gray-100 dark:border-gray-800">
-                        <span className="text-2xl">{soc.icon}</span>
-                        <p className="text-[8px] font-black uppercase text-gray-400 mt-1">{soc.label} OK</p>
                      </div>
-                   ))}
-                </div>
-
-                <div className="flex flex-col gap-3">
-                   <Button className="w-full h-16 rounded-2xl font-black uppercase tracking-widest text-white shadow-xl" style={{ backgroundColor: branding.primaryColor }}>
-                      DOWNLOAD DIRECT (4K) 💎
-                   </Button>
-                   <Link href="/biblioteca" className="w-full">
-                      <Button variant="outline" className="w-full h-16 rounded-2xl font-black uppercase tracking-widest border-2 border-gray-100">
-                         IR PARA MINHA GALERIA
-                      </Button>
-                   </Link>
-                </div>
-             </div>
-          </div>
+                  )}
+              </div>
+           </div>
         </div>
-      )}
-    </div>
-  );
-}
-
-// COMPONENTES AUXILIARES
-function SectionTitle({ title, icon }: { title: string, icon: string }) {
-  return (
-    <div className="flex items-center gap-4 pb-2 border-b border-gray-50 dark:border-gray-800">
-       <span className="text-2xl">{icon}</span>
-       <h2 className="text-xl font-black text-gray-900 dark:text-white tracking-tighter uppercase italic">{title}</h2>
-    </div>
-  );
-}
-
-function ToggleItem({ active, onClick, label }: { active: boolean, onClick: () => void, label: string }) {
-  return (
-    <div 
-     onClick={onClick}
-     className={`p-5 rounded-3xl border-2 cursor-pointer transition-all flex items-center justify-between ${active ? 'bg-blue-500/10 border-blue-500/30' : 'bg-gray-50 dark:bg-black/40 border-transparent hover:bg-gray-100'}`}
-    >
-       <span className={`text-[10px] font-black uppercase tracking-tight ${active ? 'text-blue-500' : 'text-gray-500'}`}>{label}</span>
-       <div className={`w-10 h-6 rounded-full relative transition-all ${active ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-700'}`}>
-          <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${active ? 'left-5' : 'left-1'}`}></div>
-       </div>
+      </div>
     </div>
   );
 }

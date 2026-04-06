@@ -1,37 +1,53 @@
-export type ProjectStatus = "draft" | "processing" | "completed" | "failed";
+import { Timestamp } from "firebase/firestore";
 
-export interface ProjectWatermark {
-  enabled: boolean;
-  text: string;
-  opacity: number;
-  position: "top-left" | "top-right" | "bottom-left" | "bottom-right" | "center";
-}
+export type ProjectStatus = "active" | "deleted";
 
-export interface ProjectSubtitle {
-  enabled: boolean;
-  language: string;
-  style: string;
-  fontSize: number;
-  color: string;
-}
-
-export interface ProjectExport {
-  format: "mp4" | "mov" | "avi";
-  quality: "720p" | "1080p" | "4k";
-  fps: number;
-}
-
-export interface Project {
-  id: string;
+export interface SavedProject {
+  id?: string;
+  userId: string;
+  videoId: string;
   title: string;
   thumbnail: string;
+  channelTitle: string;
+  
+  // Subtitles
+  subtitleText: string;
+  subtitleColor: string;
+  subtitleSize: number;
+  subtitlePosition: string;
+  
+  // Watermark
+  watermarkUrl: string;
+  watermarkOpacity: number;
+  watermarkPosition: string;
+  watermarkScale: number;
+  
+  // Final Screen
+  endScreenUrl: string;
+  
+  // Audio
+  audioMode: "keep" | "remove" | "mix";
+  volumeVideo: number;
+  volumeMusic: number;
+  
+  // Metadata
+  createdAt: Timestamp | any;
+  updatedAt: Timestamp | any;
+  deletedAt?: Timestamp | any | null;
   status: ProjectStatus;
-  createdAt: string;
-  updatedAt: string;
-  videoId: string;
-  config: {
-    watermark: ProjectWatermark;
-    subtitle: ProjectSubtitle;
-    export: ProjectExport;
-  };
+}
+
+export interface UserBranding {
+  systemName: string;
+  logo: string;
+  primaryColor: string;
+  secondaryColor: string;
+  defaultWatermark: string;
+  defaultEndScreen: string;
+  appearanceMode: "light" | "dark" | "system";
+}
+
+export interface UserSettings extends UserBranding {
+  userId: string;
+  updatedAt: Timestamp | any;
 }

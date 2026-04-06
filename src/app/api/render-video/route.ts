@@ -1,203 +1,96 @@
 import { NextRequest, NextResponse } from "next/server";
-import ffmpeg from "fluent-ffmpeg";
-import ffmpegStatic from "ffmpeg-static";
-import fs from "fs";
-import path from "path";
-import os from "os";
 import axios from "axios";
-import { v4 as uuidv4 } from "uuid";
+import { updateRenderJobStatus } from "@/lib/firebase/render-jobs";
 
-// Set ffmpeg path
-if (ffmpegStatic) {
-  ffmpeg.setFfmpegPath(ffmpegStatic);
-}
-
+/**
+ * API Route: /api/render-video
+ * Atua como proxy para o Cloud Run Worker, encaminhando todos os parâmetros de edição.
+ */
 export async function POST(req: NextRequest) {
-  const jobID = uuidv4();
-  const tmpDir = path.join(os.tmpdir(), `lkmovie-${jobID}`);
-  
   try {
     const body = await req.json();
     const { 
+      renderJobId,
+      userId,
+      projectId,
       videoUrl, 
-      subtitle, 
-      watermark, 
-      audioConfig,
-      aspectRatio 
+      musicUrl,
+      watermarkUrl,
+      // Novos parâmetros expandidos
+      subtitleText,
+      subtitleColor,
+      subtitleSize,
+      subtitlePosition,
+      watermarkOpacity,
+      watermarkPosition,
+      watermarkScale,
+      volumeVideo,
+      volumeMusic,
+      muteOriginal,
+      outputAspectRatio
     } = body;
 
-    if (!videoUrl) {
-      return NextResponse.json({ error: "Missing video URL" }, { status: 400 });
+    if (!renderJobId || !videoUrl || !userId) {
+      return NextResponse.json({ error: "Campos obrigatórios ausentes." }, { status: 400 });
     }
 
-    // Ensure temp dir exists
-    if (!fs.existsSync(tmpDir)) {
-      fs.mkdirSync(tmpDir, { recursive: true });
+    const workerUrl = process.env.RENDER_WORKER_URL;
+
+    if (!workerUrl) {
+      console.warn("[API] RENDER_WORKER_URL não configurada.");
+      return NextResponse.json({ 
+        message: "Job registrado, mas motor de renderização offline.",
+        jobId: renderJobId 
+      });
     }
 
-    const videoPath = path.join(tmpDir, "input_video.mp4");
-    const musicPath = path.join(tmpDir, "input_music.mp3");
-    const watermarkPath = path.join(tmpDir, "watermark.png");
-    const outputPath = path.join(tmpDir, "output_render.mp4");
-
-    // Download Assets
-    console.log(`[FFMPEG] Downloading assets for job ${jobID}...`);
+    console.log(`[API] Encaminhando job ${renderJobId} para o Worker.`);
     
-    // Download basic video
-    await downloadFile(videoUrl, videoPath);
-    
-    // Watermark if exists
-    if (watermark?.url) {
-      await downloadFile(watermark.url, watermarkPath);
-    }
-
-    // Music if exists and reachable
-    let hasMusic = false;
-    if (audioConfig?.musicUrl && !audioConfig.musicUrl.startsWith('url-')) {
-       try {
-         await downloadFile(audioConfig.musicUrl, musicPath);
-         hasMusic = true;
-       } catch (e) {
-         console.warn("[FFMPEG] Music download failed, skipping music", e);
-       }
-    }
-
-    // Font Path Fallback (Windows/Linux)
-    let fontPath = "C:/Windows/Fonts/arial.ttf";
-    if (os.platform() !== 'win32') {
-       fontPath = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
-    }
-    
-    // If we don't find it, we use a generic name
-    if (!fs.existsSync(fontPath)) {
-        fontPath = "Arial"; 
-    }
-
-    // Subtitle Style params
-    const fontSize = subtitle?.size || 24;
-    const fontColor = subtitle?.color || "white";
-    const boxColor = (subtitle?.backgroundColor === "transparent" || !subtitle?.backgroundColor) 
-       ? "black@0" 
-       : `${subtitle.backgroundColor.replace('#', '0x')}@0.6`;
-    
-    const subX = `(w-text_w)*${(subtitle?.x || 50) / 100}`;
-    const subY = `(h-text_h)*${(subtitle?.y || 80) / 100}`;
-
-    return new Promise<NextResponse>((resolve: (res: NextResponse) => void) => {
-      let command = ffmpeg(videoPath);
-
-      // Add music and watermark inputs if they exist
-      if (hasMusic) command = command.input(musicPath);
-      if (fs.existsSync(watermarkPath)) command = command.input(watermarkPath);
-
-      // Complex Filter
-      const complexFilter: any[] = [];
-      
-      // Step 1: Drawtext on video
-      complexFilter.push({
-        filter: 'drawtext',
-        options: {
-          text: subtitle?.text?.toUpperCase() || '',
-          fontfile: fontPath,
-          fontsize: fontSize * 2,
-          fontcolor: fontColor,
-          x: subX,
-          y: subY,
-          box: 1,
-          boxcolor: boxColor,
-          boxborderw: 10,
-          shadowcolor: 'black@0.4',
-          shadowx: 2,
-          shadowy: 2
-        },
-        inputs: '0:v',
-        outputs: 'v1'
+    try {
+      const response = await axios.post(`${workerUrl}/render`, {
+        renderJobId,
+        userId,
+        projectId,
+        videoUrl,
+        musicUrl: musicUrl || null,
+        watermarkUrl: watermarkUrl || null,
+        subtitleText,
+        subtitleColor,
+        subtitleSize: Number(subtitleSize),
+        subtitlePosition,
+        watermarkOpacity: Number(watermarkOpacity),
+        watermarkPosition,
+        watermarkScale: Number(watermarkScale),
+        volumeVideo: Number(volumeVideo),
+        volumeMusic: Number(volumeMusic),
+        muteOriginal: Boolean(muteOriginal),
+        outputAspectRatio
+      }, {
+        timeout: 8000 
       });
 
-      // Step 2: Overlay watermark (if exists)
-      if (fs.existsSync(watermarkPath)) {
-        const watermarkInputIndex = hasMusic ? 2 : 1;
-        complexFilter.push({
-          filter: 'overlay',
-          options: {
-            x: `(W-w)*${(watermark?.x || 90) / 100}`,
-            y: `(H-h)*${(watermark?.y || 10) / 100}`
-          },
-          inputs: ['v1', `${watermarkInputIndex}:v`],
-          outputs: 'v2'
-        });
-      }
+      return NextResponse.json({ 
+        success: true, 
+        message: "Renderização iniciada na nuvem.",
+        jobId: renderJobId
+      });
 
-      const finalVideoOutput = fs.existsSync(watermarkPath) ? 'v2' : 'v1';
+    } catch (workerError: any) {
+      console.error("[API] Erro no Worker:", workerError.message);
+      
+      await updateRenderJobStatus(renderJobId, {
+        status: "error",
+        errorMessage: "Motor de renderização indisponível."
+      });
 
-      command
-        .complexFilter(complexFilter, finalVideoOutput)
-        .audioFilters([
-           // Mix video audio [0:a] and music audio [1:a]
-           `amix=inputs=${hasMusic ? 2 : 1}:duration=first:dropout_transition=3`
-        ])
-        .outputOptions([
-          '-c:v libx264',
-          '-preset ultrafast',
-          '-crf 23',
-          '-pix_fmt yuv420p',
-          '-c:a aac',
-          '-b:a 192k'
-        ])
-        .on("start", (cmd: string) => console.log("[FFMPEG] Starting Render:", cmd))
-        .on("error", (err: any) => {
-          console.error("[FFMPEG] Render Error:", err);
-          cleanup(tmpDir);
-          resolve(NextResponse.json({ error: `FFmpeg failed: ${err.message}` }, { status: 500 }));
-        })
-        .on("end", () => {
-          console.log("[FFMPEG] Render Finished:", jobID);
-          try {
-            const videoBuffer = fs.readFileSync(outputPath);
-            cleanup(tmpDir);
-            const response = new NextResponse(videoBuffer, {
-              headers: {
-                "Content-Type": "video/mp4",
-                "Content-Disposition": `attachment; filename="lkmovie-${jobID}.mp4"`,
-              }
-            });
-            resolve(response);
-          } catch (e) {
-            resolve(NextResponse.json({ error: "Failed to read output file" }, { status: 500 }));
-          }
-        })
-        .save(outputPath);
-    });
+      return NextResponse.json({ 
+        error: "Erro na comunicação com o worker.",
+        details: workerError.message 
+      }, { status: 502 });
+    }
 
   } catch (err: any) {
-    console.error("[API] Fatal Render Error:", err);
-    cleanup(tmpDir);
-    return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 });
-  }
-}
-
-async function downloadFile(url: string, dest: string) {
-  const response = await axios({
-    url,
-    method: "GET",
-    responseType: "stream",
-    timeout: 30000,
-  });
-  const writer = fs.createWriteStream(dest);
-  response.data.pipe(writer);
-  return new Promise<void>((resolve, reject) => {
-    writer.on("finish", () => resolve());
-    writer.on("error", reject);
-    response.data.on("error", reject);
-  });
-}
-
-function cleanup(dir: string) {
-  try {
-    if (fs.existsSync(dir)) {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  } catch (e) {
-    console.error("[API] Cleanup error:", e);
+    console.error("[API] Fatal Render Proxy Error:", err);
+    return NextResponse.json({ error: "Erro interno no servidor." }, { status: 500 });
   }
 }
