@@ -12,6 +12,7 @@ import {
   serverTimestamp 
 } from "firebase/firestore";
 import { db } from "./config";
+import { incrementUserStat } from "./user-settings";
 import { RenderJob, RenderStatus } from "@/types/render";
 export type { RenderJob, RenderStatus };
 
@@ -48,6 +49,13 @@ export const createRenderJob = async (userId: string, projectId: string) => {
   };
 
   const docRef = await addDoc(jobsRef, data);
+  
+  // Atualizar Analytics e Uso (SaaS)
+  await Promise.all([
+    incrementUserStat(userId, "usage.rendersCount"),
+    incrementUserStat(userId, "analytics.totalRenders")
+  ]);
+
   return docRef.id;
 };
 

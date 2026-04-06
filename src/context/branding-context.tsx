@@ -6,6 +6,8 @@ import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 import { Toast } from "@/components/ui/Toast";
 
+import { UserSettings, UserUsage, UserAnalytics } from "@/types/project.d";
+
 export interface Branding {
   appName: string;
   logo: string;
@@ -14,6 +16,9 @@ export interface Branding {
   defaultWatermark: string;
   defaultEndScreen: string;
   hasSeenOnboarding: boolean;
+  plan?: "free" | "pro";
+  usage?: UserUsage;
+  analytics?: UserAnalytics;
 }
 
 interface BrandingContextType {

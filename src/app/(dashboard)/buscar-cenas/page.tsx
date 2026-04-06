@@ -16,6 +16,21 @@ import {
   SearchRecord 
 } from "@/lib/firebase/search";
 import { getCachedSearch, saveSearchToCache } from "@/lib/cache/search-cache";
+import { canPerformAction } from "@/lib/utils/usage-limits";
+import { incrementUserStat } from "@/lib/firebase/user-settings";
+import { addFavorite, getUserFavorites, FavoriteVideo } from "@/lib/firebase/favorites";
+
+/**
+ * Hook de Debounce customizado para performance de busca
+ */
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+  return debouncedValue;
+}
 
 export default function BuscarCenasPage() {
   const [query, setQuery] = useState("");
@@ -27,8 +42,11 @@ export default function BuscarCenasPage() {
   const [totalResults, setTotalResults] = useState<number>(0);
   
   const [history, setHistory] = useState<SearchRecord[]>([]);
+  const [favorites, setFavorites] = useState<FavoriteVideo[]>([]);
   const [activeNiche, setActiveNiche] = useState("Cinematic");
   const [showFilters, setShowFilters] = useState(false);
+  
+  const debouncedQuery = useDebounce(query, 600);
   
   const [filters, setFilters] = useState({
     duration: "any",
@@ -45,12 +63,20 @@ export default function BuscarCenasPage() {
   const router = useRouter();
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Carregar Histórico
+  // Carregar Histórico e Favoritos
   useEffect(() => {
     if (user) {
       getUserSearchHistory(user.uid).then(setHistory);
+      getUserFavorites(user.uid).then(setFavorites);
     }
   }, [user]);
+
+  // Busca Automática com Debounce (Premium Performance)
+  useEffect(() => {
+    if (debouncedQuery.trim().length > 2 && results.length === 0) {
+      handleSearch(undefined, debouncedQuery);
+    }
+  }, [debouncedQuery]);
 
   const handleSearch = async (e?: React.FormEvent, customQuery?: string, isLoadMore = false) => {
     e?.preventDefault();
@@ -58,6 +84,15 @@ export default function BuscarCenasPage() {
     if (!baseTerm.trim()) return;
 
     const searchTerm = baseTerm.trim();
+
+    // Verificação de Limites (SaaS Protection)
+    if (branding && user) {
+      const { allowed, message } = canPerformAction(branding as any, "search");
+      if (!allowed) {
+        setError(message || "Limite de busca atingido.");
+        return;
+      }
+    }
 
     if (isLoadMore) {
       setLoadingMore(true);
@@ -120,7 +155,12 @@ export default function BuscarCenasPage() {
       setTotalResults(data.totalResults || 0);
       
       if (user && !isLoadMore) {
-        await saveSearchQuery(user.uid, searchTerm);
+        // Atualizar Uso e Analytics (SaaS Metrics)
+        await Promise.all([
+          saveSearchQuery(user.uid, searchTerm),
+          incrementUserStat(user.uid, "usage.searchesCount"),
+          incrementUserStat(user.uid, "analytics.totalSearches")
+        ]);
         getUserSearchHistory(user.uid).then(setHistory);
       }
     } catch (err: any) {
@@ -151,6 +191,18 @@ export default function BuscarCenasPage() {
   const handleSelectVideo = (video: YouTubeVideo) => {
     setSelectedVideo(video);
     router.push("/editor");
+  };
+
+  const handleToggleFavorite = async (e: React.MouseEvent, video: YouTubeVideo) => {
+    e.stopPropagation();
+    if (!user) return;
+    try {
+      await addFavorite(user.uid, video);
+      const favs = await getUserFavorites(user.uid);
+      setFavorites(favs);
+    } catch (error) {
+      console.error("Erro ao favoritar:", error);
+    }
   };
 
   const suggestions = getNicheSuggestions();
@@ -242,33 +294,43 @@ export default function BuscarCenasPage() {
                 </div>
               ))
             ) : (
-              results.map((video) => (
-                <div 
-                  key={video.id} 
-                  className="group bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl overflow-hidden shadow-md hover:shadow-2xl transition-all flex flex-col cursor-pointer transform hover:-translate-y-2 duration-300"
-                  onClick={() => handleSelectVideo(video)}
-                >
-                  <div className="aspect-video relative overflow-hidden bg-gray-100 dark:bg-black">
-                    <img 
-                      src={video.thumbnail} 
-                      alt={video.title} 
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
-                      loading="lazy"
-                    />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
-                       <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-black text-xl shadow-2xl scale-50 group-hover:scale-100 transition-transform duration-300">▶</div>
+              results.map((video) => {
+                const isFav = favorites.some(f => f.videoId === video.id);
+                return (
+                  <div 
+                    key={video.id} 
+                    className="group bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl overflow-hidden shadow-md hover:shadow-2xl transition-all flex flex-col cursor-pointer transform hover:-translate-y-2 duration-300 relative"
+                    onClick={() => handleSelectVideo(video)}
+                  >
+                    <div className="aspect-video relative overflow-hidden bg-gray-100 dark:bg-black">
+                      <img 
+                        src={video.thumbnail} 
+                        alt={video.title} 
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
+                        loading="lazy"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
+                         <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-black text-xl shadow-2xl scale-50 group-hover:scale-100 transition-transform duration-300">▶</div>
+                      </div>
+                      
+                      <button 
+                        onClick={(e) => handleToggleFavorite(e, video)}
+                        className={`absolute top-4 right-4 w-10 h-10 rounded-xl flex items-center justify-center backdrop-blur-md transition-all shadow-xl z-20 ${isFav ? 'bg-red-500 text-white' : 'bg-black/20 text-white hover:bg-white hover:text-red-500'}`}
+                      >
+                         {isFav ? "❤️" : "🤍"}
+                      </button>
+                    </div>
+                    
+                    <div className="p-5 space-y-3 flex-1 flex flex-col justify-between">
+                      <h3 className="text-sm font-black text-gray-900 dark:text-white line-clamp-2 leading-tight">{video.title}</h3>
+                      <div className="flex items-center justify-between opacity-60">
+                         <span className="text-[9px] font-black uppercase tracking-widest truncate max-w-[120px]">{video.channel}</span>
+                         <span className="text-[9px] font-black text-blue-500 uppercase">4K / UHD</span>
+                      </div>
                     </div>
                   </div>
-                  
-                  <div className="p-5 space-y-3 flex-1 flex flex-col justify-between">
-                    <h3 className="text-sm font-black text-gray-900 dark:text-white line-clamp-2 leading-tight">{video.title}</h3>
-                    <div className="flex items-center justify-between opacity-60">
-                       <span className="text-[9px] font-black uppercase tracking-widest truncate max-w-[120px]">{video.channel}</span>
-                       <span className="text-[9px] font-black text-blue-500 uppercase">4K / UHD</span>
-                    </div>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
             
             {loadingMore && Array.from({ length: 4 }).map((_, i) => (

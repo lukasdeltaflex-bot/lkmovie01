@@ -47,7 +47,26 @@ export interface UserBranding {
   appearanceMode: "light" | "dark" | "system";
 }
 
+export interface UserUsage {
+  searchesCount: number;
+  projectsCount: number;
+  rendersCount: number;
+  lastResetAt: Timestamp | any;
+}
+
+export interface UserAnalytics {
+  totalSearches: number;
+  totalProjects: number;
+  totalRenders: number;
+  lastLoginAt: Timestamp | any;
+  lastProjectAt: Timestamp | any;
+}
+
 export interface UserSettings extends UserBranding {
   userId: string;
+  plan: "free" | "pro";
+  hasSeenOnboarding: boolean;
+  usage: UserUsage;
+  analytics: UserAnalytics;
   updatedAt: Timestamp | any;
 }

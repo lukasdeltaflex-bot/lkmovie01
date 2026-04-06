@@ -14,22 +14,28 @@ export function OnboardingModal({ onComplete }: OnboardingModalProps) {
 
   const steps = [
     {
-      title: "Boas-vindas ao Estúdio SaaS",
-      content: "Transforme cenas épicas em vídeos virais com a identidade da sua marca em segundos.",
+      title: "Busque Cenas Inteligentes",
+      content: "Acesse uma biblioteca infinita de cenas cinematográficas com nossa busca premium de clipes 4K.",
+      icon: "🔍",
+      color: "#3b82f6"
+    },
+    {
+      title: "Edição Profissional em Segundos",
+      content: "Legendas automáticas, watermarks da sua marca e mixagem de áudio com um clique.",
       icon: "🎬",
       color: branding.primaryColor
     },
     {
-      title: "Sua Marca em Todo Lugar",
-      content: "Configure sua marca d'água e logo final nas configurações para automação total.",
-      icon: "💎",
+      title: "Renderização Cloud Turbo",
+      content: "Gere vídeos de alta performance em nossos servidores enquanto você já cria o próximo projeto.",
+      icon: "⚙️",
       color: branding.secondaryColor
     },
     {
-      title: "Edição Interativa Cloud",
-      content: "Arraste legendas, escolha proporções (Reels, Shorts) e salve seus próprios presets.",
+      title: "Resultados Premium",
+      content: "Transforme sua presença digital com conteúdos de altíssimo nível prontos para viralizar.",
       icon: "🚀",
-      color: "#3b82f6"
+      color: "#10b981"
     }
   ];
 

@@ -13,6 +13,7 @@ import {
   serverTimestamp 
 } from "firebase/firestore";
 import { db } from "./config";
+import { incrementUserStat } from "./user-settings";
 import { SavedProject, ProjectStatus } from "@/types/project";
 export type { SavedProject, ProjectStatus };
 
@@ -43,6 +44,13 @@ export const createProject = async (projectData: Omit<SavedProject, "id" | "crea
   };
 
   const docRef = await addDoc(projectsRef, dataToSave);
+  
+  // Atualizar Analytics e Uso (SaaS)
+  await Promise.all([
+    incrementUserStat(projectData.userId, "usage.projectsCount"),
+    incrementUserStat(projectData.userId, "analytics.totalProjects")
+  ]);
+
   return docRef.id;
 };
 
