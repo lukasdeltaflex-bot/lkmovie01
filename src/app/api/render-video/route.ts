@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
       console.error("[API] Erro no Worker:", workerError.message);
       
       await updateRenderJobStatus(renderJobId, {
-        status: "error",
+        status: "failed",
         errorMessage: "Motor de renderização indisponível."
       });
 

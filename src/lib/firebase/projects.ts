@@ -9,10 +9,12 @@ import {
   query, 
   where, 
   orderBy, 
+  limit,
   serverTimestamp 
 } from "firebase/firestore";
 import { db } from "./config";
-import { SavedProject } from "@/types/project.d";
+import { SavedProject, ProjectStatus } from "@/types/project";
+export type { SavedProject, ProjectStatus };
 
 /**
  * Cria um novo projeto no Firestore
@@ -58,6 +60,28 @@ export const getUserProjects = async (userId: string) => {
     where("userId", "==", userId),
     where("status", "==", "active"),
     orderBy("createdAt", "desc")
+  );
+
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  })) as SavedProject[];
+};
+
+/**
+ * Busca os N projetos mais recentes ativos de um usuário
+ */
+export const getRecentProjects = async (userId: string, limitCount: number = 4) => {
+  if (!db) throw new Error("Firestore não inicializado");
+
+  const projectsRef = collection(db, "projects");
+  const q = query(
+    projectsRef, 
+    where("userId", "==", userId),
+    where("status", "==", "active"),
+    orderBy("createdAt", "desc"),
+    limit(limitCount)
   );
 
   const snapshot = await getDocs(q);

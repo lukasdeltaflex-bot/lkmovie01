@@ -13,6 +13,7 @@ import {
 } from "firebase/firestore";
 import { db } from "./config";
 import { RenderJob, RenderStatus } from "@/types/render";
+export type { RenderJob, RenderStatus };
 
 /**
  * Cria um novo job de renderização
@@ -39,7 +40,7 @@ export const createRenderJob = async (userId: string, projectId: string) => {
 /**
  * Atualiza o status e/ou progresso de um job
  */
-export const updateRenderJob = async (jobId: string, data: Partial<Omit<RenderJob, "id" | "userId" | "projectId" | "createdAt">>) => {
+export const updateRenderJobStatus = async (jobId: string, data: Partial<Omit<RenderJob, "id" | "userId" | "projectId" | "createdAt">>) => {
   if (!db) throw new Error("Firestore não inicializado");
   
   const docRef = doc(db, "renderJobs", jobId);
