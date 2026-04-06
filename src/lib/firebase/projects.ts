@@ -111,3 +111,37 @@ export const hardDeleteProject = async (projectId: string) => {
   if (!db) return;
   await deleteDoc(doc(db, "projects", projectId));
 };
+
+export const getDeletedProjects = async (userId: string) => {
+  if (!db) throw new Error("Firestore não inicializado");
+  const q = query(
+    collection(db, "projects"), 
+    where("userId", "==", userId),
+    where("status", "==", "deleted"),
+    orderBy("deletedAt", "desc")
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as SavedProject[];
+};
+
+export const restoreProject = async (projectId: string) => {
+  if (!db) return;
+  await updateDoc(doc(db, "projects", projectId), { 
+    status: "active", 
+    deletedAt: null,
+    updatedAt: serverTimestamp() 
+  });
+};
+
+export const getRecentProjects = async (userId: string, limitCount: number = 4) => {
+  if (!db) throw new Error("Firestore não inicializado");
+  const q = query(
+    collection(db, "projects"), 
+    where("userId", "==", userId),
+    where("status", "==", "active"),
+    orderBy("createdAt", "desc"),
+    limit(limitCount)
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as SavedProject[];
+};

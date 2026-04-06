@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useSelectedVideo } from "@/context/selected-video-context";
 import { useAuth } from "@/context/auth-context";
@@ -17,7 +17,7 @@ import { SavedProject } from "@/types/project.d";
 type AspectRatio = "16:9" | "9:16" | "1:1";
 type EditorSection = "video" | "subtitle" | "audio" | "watermark" | "platform";
 
-export default function EditorPage() {
+function EditorContent() {
   const { selectedVideo, clips, activeClipIndex, setActiveClipIndex, setClips } = useSelectedVideo();
   const { user } = useAuth();
   const { branding, showToast } = useBranding();
@@ -465,5 +465,18 @@ export default function EditorPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function EditorPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col gap-6 h-full items-center justify-center min-h-[60vh]">
+        <div className="animate-spin w-16 h-16 border-4 border-t-transparent border-blue-500 rounded-full"></div>
+        <p className="text-xs font-black text-gray-400 uppercase tracking-[0.3em]">Carregando Editor...</p>
+      </div>
+    }>
+      <EditorContent />
+    </Suspense>
   );
 }

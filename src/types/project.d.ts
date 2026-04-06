@@ -51,6 +51,7 @@ export interface UserUsage {
   searchesCount: number;
   projectsCount: number;
   rendersCount: number;
+  referralsCount?: number;
   lastResetAt: Timestamp | any;
 }
 

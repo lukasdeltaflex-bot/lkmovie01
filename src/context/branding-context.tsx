@@ -21,6 +21,7 @@ export interface Branding {
   plan?: "free" | "pro";
   usage?: UserUsage;
   analytics?: UserAnalytics;
+  referralCode?: string;
 }
 
 interface BrandingContextType {
