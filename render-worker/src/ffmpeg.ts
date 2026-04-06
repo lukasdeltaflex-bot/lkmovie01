@@ -1,21 +1,35 @@
-import * as ffmpeg from "fluent-ffmpeg";
-import * as ffmpegStatic from "ffmpeg-static";
+import ffmpeg from "fluent-ffmpeg";
+import ffmpegStatic from "ffmpeg-static";
 import { RenderJobPayload } from "./types";
 
 if (process.env.NODE_ENV !== "production") {
-  ffmpeg.setFfmpegPath(ffmpegStatic as string);
+  if (ffmpegStatic) {
+    ffmpeg.setFfmpegPath(ffmpegStatic);
+  }
 }
 
 export function buildVideoFilter(payload: RenderJobPayload, hasWatermark: boolean): string[] {
   const filters: string[] = [];
 
-  if (payload.subtitleText) {
-    const text = payload.subtitleText.replace(/[:']/g, "\\$&");
+  if (payload.subtitleText && payload.subtitleType !== "none") {
     const color = payload.subtitleColor || "white";
     const size = payload.subtitleSize || 24;
     const pos = payload.subtitlePosition || "bottom";
-    const y = pos === "top" ? "40" : pos === "middle" ? "(h-text_h)/2" : "h-text_h-40";
-    filters.push(`drawtext=text='${text}':fontcolor=${color}:fontsize=${size}:x=(w-text_w)/2:y=${y}:box=1:boxcolor=black@0.5:boxborderw=5`);
+    const isDual = payload.subtitleType === "both";
+    
+    const lines = payload.subtitleText.split("\n");
+    const ptText = lines[0].replace(/[:']/g, "\\$&");
+    const enText = lines[1] ? lines[1].replace(/[:']/g, "\\$&") : "";
+
+    const yBase = pos === "top" ? "40" : pos === "middle" ? "(h-text_h)/2" : "h-text_h-100";
+
+    if (isDual && enText) {
+      filters.push(`drawtext=text='${ptText}':fontcolor=${color}:fontsize=${size}:x=(w-text_w)/2:y=${yBase}:box=1:boxcolor=black@0.5:boxborderw=10`);
+      filters.push(`drawtext=text='${enText}':fontcolor=yellow:fontsize=${Math.floor(size * 0.8)}:x=(w-text_w)/2:y=${yBase}+${size}+15:box=1:boxcolor=black@0.5:boxborderw=10`);
+    } else {
+      const textToRender = (payload.subtitleType === "en" ? enText || ptText : ptText);
+      filters.push(`drawtext=text='${textToRender}':fontcolor=${color}:fontsize=${size}:x=(w-text_w)/2:y=${yBase}:box=1:boxcolor=black@0.5:boxborderw=10`);
+    }
   }
 
   return filters;
@@ -81,7 +95,7 @@ export function renderVideoJob(
     }
 
     command
-      .on("error", (err) => {
+      .on("error", (err: Error) => {
         console.error("FFMPEG ERROR:", err);
         reject(err);
       })
@@ -92,3 +106,4 @@ export function renderVideoJob(
       .save(outputPath);
   });
 }
+

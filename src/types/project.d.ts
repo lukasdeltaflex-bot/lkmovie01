@@ -2,6 +2,16 @@ import { Timestamp } from "firebase/firestore";
 
 export type ProjectStatus = "active" | "deleted";
 
+export interface TimelineEvent {
+  id: string;
+  type: "video" | "audio" | "subtitle" | "overlay";
+  startTime: number; // In seconds
+  duration: number;
+  content: string; // URL or Text
+  track: number; // Layer (0, 1, 2...)
+  metadata?: any;
+}
+
 export interface SavedProject {
   id?: string;
   userId: string;
@@ -10,11 +20,16 @@ export interface SavedProject {
   thumbnail: string;
   channelTitle: string;
   
-  // Subtitles
+  // Timeline (CapCut Engine)
+  timeline?: TimelineEvent[];
+  
+  // Global / Legacy Subtitles (Backward Compatibility)
   subtitleText: string;
   subtitleColor: string;
   subtitleSize: number;
   subtitlePosition: string;
+  subtitleType: "none" | "pt" | "en" | "both";
+  isAutoSubtitle: boolean;
   
   // Watermark
   watermarkUrl: string;
@@ -29,6 +44,8 @@ export interface SavedProject {
   audioMode: "keep" | "remove" | "mix";
   volumeVideo: number;
   volumeMusic: number;
+  musicUrl?: string;
+  musicCategory?: string;
   
   // Metadata
   createdAt: Timestamp | any;

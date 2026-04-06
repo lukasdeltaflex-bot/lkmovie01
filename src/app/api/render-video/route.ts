@@ -16,8 +16,8 @@ export async function POST(req: NextRequest) {
       videoUrl, 
       musicUrl,
       watermarkUrl,
-      // Novos parâmetros expandidos
       subtitleText,
+      subtitleType,
       subtitleColor,
       subtitleSize,
       subtitlePosition,
@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
         musicUrl: musicUrl || null,
         watermarkUrl: watermarkUrl || null,
         subtitleText,
+        subtitleType,
         subtitleColor,
         subtitleSize: Number(subtitleSize),
         subtitlePosition,

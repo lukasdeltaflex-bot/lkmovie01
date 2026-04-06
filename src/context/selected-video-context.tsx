@@ -14,15 +14,28 @@ interface VideoClip extends YouTubeVideo {
   };
 }
 
+export interface TimelineEvent {
+  id: string;
+  type: "video" | "audio" | "subtitle" | "overlay";
+  startTime: number;
+  duration: number;
+  content: string;
+  track: number;
+  metadata?: any;
+}
+
 interface TimelineContextType {
+  timeline: TimelineEvent[];
   clips: VideoClip[];
   activeClipIndex: number;
   addClip: (video: YouTubeVideo) => void;
   removeClip: (index: number) => void;
   setActiveClipIndex: (index: number) => void;
   setClips: (clips: VideoClip[]) => void;
+  addTimelineEvent: (event: Omit<TimelineEvent, "id">) => void;
+  removeTimelineEvent: (id: string) => void;
   clearTimeline: () => void;
-  // Legacy support for single-video components
+  // Legacy support
   selectedVideo: YouTubeVideo | null;
   setSelectedVideo: (video: YouTubeVideo | null) => void;
 }
@@ -30,11 +43,32 @@ interface TimelineContextType {
 const TimelineContext = createContext<TimelineContextType | undefined>(undefined);
 
 export function SelectedVideoProvider({ children }: { children: ReactNode }) {
+  const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [clips, setClips] = useState<VideoClip[]>([]);
   const [activeClipIndex, setActiveClipIndex] = useState(0);
 
   const addClip = (video: YouTubeVideo) => {
-    setClips(prev => [...prev, { ...video, zoom: 100, startTime: 0, endTime: 15 }]);
+    const id = `v-${Date.now()}`;
+    const newClip = { ...video, zoom: 100, startTime: 0, endTime: 15 };
+    setClips(prev => [...prev, newClip]);
+    
+    // Add to timeline V1 automatically
+    addTimelineEvent({
+      type: "video",
+      startTime: timeline.reduce((acc, ev) => Math.max(acc, ev.startTime + ev.duration), 0),
+      duration: 15,
+      content: video.thumbnail,
+      track: 0,
+      metadata: { videoId: video.id }
+    });
+  };
+
+  const addTimelineEvent = (event: Omit<TimelineEvent, "id">) => {
+    setTimeline(prev => [...prev, { ...event, id: `ev-${Date.now()}` }]);
+  };
+
+  const removeTimelineEvent = (id: string) => {
+    setTimeline(prev => prev.filter(e => e.id !== id));
   };
 
   const removeClip = (index: number) => {
@@ -44,6 +78,7 @@ export function SelectedVideoProvider({ children }: { children: ReactNode }) {
 
   const clearTimeline = () => {
     setClips([]);
+    setTimeline([]);
     setActiveClipIndex(0);
   };
 
@@ -61,12 +96,15 @@ export function SelectedVideoProvider({ children }: { children: ReactNode }) {
 
   return (
     <TimelineContext.Provider value={{ 
+      timeline,
       clips, 
       activeClipIndex, 
       addClip, 
       removeClip, 
       setActiveClipIndex, 
       setClips,
+      addTimelineEvent,
+      removeTimelineEvent,
       clearTimeline,
       selectedVideo,
       setSelectedVideo

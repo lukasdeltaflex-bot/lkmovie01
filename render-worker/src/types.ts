@@ -6,6 +6,7 @@ export interface RenderJobPayload {
   projectId: string;
   videoUrl: string;
   subtitleText?: string;
+  subtitleType?: "none" | "pt" | "en" | "both";
   subtitleColor?: string;
   subtitleSize?: number;
   subtitlePosition?: string;
@@ -19,3 +20,4 @@ export interface RenderJobPayload {
   muteOriginal?: boolean;
   outputAspectRatio?: string;
 }
+
