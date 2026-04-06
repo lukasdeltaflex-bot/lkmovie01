@@ -176,8 +176,30 @@ export default function EditorPage() {
     
     try {
       // Criar o Job no Firestore
-      await createRenderJob(user.uid, currentProjectId);
+      const renderJobId = await createRenderJob(user.uid, currentProjectId);
       
+      // Chamar API de Renderização Real
+      setRenderStatus("ENVIANDO PARA NUVEM...");
+      await axios.post("/api/render-video", {
+        renderJobId,
+        userId: user.uid,
+        projectId: currentProjectId,
+        videoUrl: selectedVideo.thumbnail, // Usando thumbnail como mock de vídeo para teste, mudar conforme necessário
+        subtitleText: subtitle.text,
+        subtitleColor: subtitle.color,
+        subtitleSize: subtitle.size,
+        subtitlePosition: subtitle.y > 60 ? "bottom" : subtitle.y < 40 ? "top" : "center",
+        watermarkUrl: watermark.url || branding.defaultWatermark,
+        watermarkOpacity: watermark.opacity / 100,
+        watermarkPosition: watermark.x > 50 ? (watermark.y > 50 ? "bottom-right" : "top-right") : (watermark.y > 50 ? "bottom-left" : "top-left"),
+        watermarkScale: watermark.size / 500,
+        musicUrl: audioConfig.musicUrl,
+        volumeVideo: audioConfig.videoVolume / 100,
+        volumeMusic: audioConfig.musicVolume / 100,
+        muteOriginal: audioConfig.mixMode === "remove",
+        outputAspectRatio: videoConfig.aspectRatio
+      });
+
       setRenderProgress(100);
       setRenderStatus("SOLICITAÇÃO ENVIADA!");
       showToast("Geração iniciada! Acompanhe na biblioteca.", "success");
