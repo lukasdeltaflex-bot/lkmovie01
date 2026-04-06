@@ -119,6 +119,8 @@ export function AutoVideoModal({ onClose }: AutoVideoModalProps) {
         subtitleColor: config.style.color,
         subtitleSize: config.style.size,
         subtitlePosition: config.style.position as any,
+        subtitleType: "pt", // Padrão para auto-gerado
+        isAutoSubtitle: true,
         watermarkUrl: branding.defaultWatermark || "",
         watermarkOpacity: 60,
         watermarkPosition: platform === "youtube" ? "bottom-right" : "bottom-left",
@@ -128,6 +130,7 @@ export function AutoVideoModal({ onClose }: AutoVideoModalProps) {
         volumeVideo: 1,
         volumeMusic: config.audio.volumeMusic || 0.6,
       });
+
 
       const renderJobId = await createRenderJob(user.uid, projectId);
       setJobId(renderJobId);

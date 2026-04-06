@@ -137,7 +137,11 @@ function EditorContent() {
         watermarkScale: watermark.size / 500,
         musicUrl: selectedMusic?.url || "",
         musicVolume: musicVolume / 100,
-        status: "active",
+        isAutoSubtitle: false,
+        channelTitle: clips[0].channel || "SaaS Creator",
+        endScreenUrl: branding.defaultEndScreen || "",
+        audioMode: "mix",
+        volumeVideo: volume / 100,
       };
 
       let currentId = projectId;
