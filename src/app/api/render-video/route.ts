@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
         muteOriginal: Boolean(muteOriginal),
         outputAspectRatio
       }, {
-        timeout: 8000 
+        timeout: 10000 // Aumentado para 10s para evitar timeouts espúrios
       });
 
       return NextResponse.json({ 
@@ -76,17 +76,21 @@ export async function POST(req: NextRequest) {
       });
 
     } catch (workerError: any) {
-      console.error("[API] Erro no Worker:", workerError.message);
+      const isTimeout = workerError.code === 'ECONNABORTED';
+      const statusCode = workerError.response?.status || 502;
+      const errorDetail = workerError.response?.data?.message || workerError.message;
+
+      console.error(`[API] Erro ao chamar worker (Job ${renderJobId}):`, errorDetail);
       
       await updateRenderJobStatus(renderJobId, {
         status: "failed",
-        errorMessage: "Motor de renderização indisponível."
+        errorMessage: isTimeout ? "Timeout ao tentar iniciar renderização." : `Erro no motor: ${errorDetail}`
       });
 
       return NextResponse.json({ 
-        error: "Erro na comunicação com o worker.",
-        details: workerError.message 
-      }, { status: 502 });
+        error: isTimeout ? "O motor de renderização demorou demais para responder." : "Erro na comunicação com o worker.",
+        details: errorDetail
+      }, { status: statusCode });
     }
 
   } catch (err: any) {

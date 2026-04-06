@@ -17,15 +17,26 @@ import { SavedProject, ProjectStatus } from "@/types/project";
 export type { SavedProject, ProjectStatus };
 
 /**
- * Cria um novo projeto no Firestore
+ * Cria um novo projeto no Firestore com validação de dados
  */
 export const createProject = async (projectData: Omit<SavedProject, "id" | "createdAt" | "updatedAt" | "deletedAt" | "status">) => {
   if (!db) throw new Error("Firestore não inicializado");
   
+  // Validação de campos obrigatórios
+  if (!projectData.userId) throw new Error("userId é obrigatório");
+  if (!projectData.title) throw new Error("Título do projeto é obrigatório");
+  if (!projectData.videoId) throw new Error("videoId é obrigatório");
+
   const projectsRef = collection(db, "projects");
   const dataToSave = {
     ...projectData,
-    status: "active",
+    // Sanitização de valores numéricos para garantir estabilidade no FFmpeg
+    subtitleSize: Number(projectData.subtitleSize) || 28,
+    watermarkOpacity: Number(projectData.watermarkOpacity) || 80,
+    watermarkScale: Number(projectData.watermarkScale) || 0.2,
+    volumeVideo: Number(projectData.volumeVideo) ?? 1,
+    volumeMusic: Number(projectData.volumeMusic) ?? 0.5,
+    status: "active" as ProjectStatus,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     deletedAt: null,
@@ -36,14 +47,23 @@ export const createProject = async (projectData: Omit<SavedProject, "id" | "crea
 };
 
 /**
- * Atualiza um projeto existente
+ * Atualiza um projeto existente com validação parcial
  */
 export const updateProject = async (projectId: string, projectData: Partial<SavedProject>) => {
   if (!db) throw new Error("Firestore não inicializado");
+  if (!projectId) throw new Error("projectId é necessário para atualização");
   
   const docRef = doc(db, "projects", projectId);
+  
+  // Filtrar campos que não devem ser editados via updateProject genérico ou sanitizar
+  const sanitizedData: any = { ...projectData };
+  if (sanitizedData.subtitleSize !== undefined) sanitizedData.subtitleSize = Number(sanitizedData.subtitleSize);
+  if (sanitizedData.watermarkScale !== undefined) sanitizedData.watermarkScale = Number(sanitizedData.watermarkScale);
+  if (sanitizedData.volumeVideo !== undefined) sanitizedData.volumeVideo = Number(sanitizedData.volumeVideo);
+  if (sanitizedData.volumeMusic !== undefined) sanitizedData.volumeMusic = Number(sanitizedData.volumeMusic);
+
   await updateDoc(docRef, {
-    ...projectData,
+    ...sanitizedData,
     updatedAt: serverTimestamp(),
   });
 };

@@ -180,11 +180,13 @@ export default function EditorPage() {
       
       // Chamar API de Renderização Real
       setRenderStatus("ENVIANDO PARA NUVEM...");
+      setRenderProgress(30);
+
       await axios.post("/api/render-video", {
         renderJobId,
         userId: user.uid,
         projectId: currentProjectId,
-        videoUrl: selectedVideo.thumbnail, // Usando thumbnail como mock de vídeo para teste, mudar conforme necessário
+        videoUrl: selectedVideo.thumbnail, // Usando thumbnail como fallback de vídeo para teste
         subtitleText: subtitle.text,
         subtitleColor: subtitle.color,
         subtitleSize: subtitle.size,
@@ -208,8 +210,9 @@ export default function EditorPage() {
         router.push("/biblioteca");
       }, 1500);
     } catch (error: any) {
-      console.error(error);
-      showToast("Erro ao iniciar geração.", "error");
+      console.error("[Editor] Render Error:", error);
+      const msg = error.response?.data?.error || "Erro ao iniciar geração.";
+      showToast(msg, "error");
       setIsRendering(false);
     }
   };

@@ -36,22 +36,40 @@ export async function processRenderJob(payload: RenderJobPayload) {
     tempFiles.push(outputPath);
 
     await renderVideoJob(videoPath, outputPath, payload, watermarkPath, musicPath);
+    
+    // Verificar se o arquivo foi realmente gerado (Blindagem)
+    if (!fs.existsSync(outputPath)) {
+      throw new Error("FFmpeg finalizou mas o arquivo de saída não foi gerado.");
+    }
+    
+    await db.collection("renderJobs").doc(renderJobId).update({ progress: 80, updatedAt: new Date() });
 
+    // 6. Upload Final Video
+    console.log(`[Job ${renderJobId}] Subindo para o Storage...`);
     const storagePath = `renders/${userId}/${outputName}`;
     await uploadRenderedFile(outputPath, storagePath);
+
+    // 7. Get Signed URL
+    console.log(`[Job ${renderJobId}] Gerando URL assinada...`);
     const downloadUrl = await createSignedReadUrl(storagePath);
 
+    // 8. Update Firestore to "completed"
     await db.collection("renderJobs").doc(renderJobId).update({
       status: "completed",
+      progress: 100,
       outputUrl: downloadUrl,
       updatedAt: new Date(),
     });
 
+    console.log(`[Job ${renderJobId}] Job finalizado com sucesso: ${storagePath}`);
+
   } catch (error: any) {
-    console.error("Render Error:", error);
+    const errorMsg = error?.message || "Erro desconhecido na renderização";
+    console.error(`[Job ${renderJobId}] FALHA CRÍTICA:`, errorMsg);
+    
     await db.collection("renderJobs").doc(renderJobId).update({
       status: "failed",
-      errorMessage: error.message,
+      errorMessage: errorMsg,
       updatedAt: new Date(),
     });
   } finally {

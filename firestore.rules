@@ -1,0 +1,51 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is authenticated
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // Helper to check if user owns the document
+    function isOwner(userId) {
+      return isAuth() && request.auth.uid == userId;
+    }
+
+    // Projects: User can only see and edit their own projects
+    match /projects/{projectId} {
+      allow read, update, delete: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+    }
+
+    // RenderJobs: User can only see and create their own jobs
+    match /renderJobs/{jobId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+      // Update allowed for the system/worker (in production this would be more restricted,
+      // but for simple Firebase setup without separate service accounts rules, we allow the owner)
+      allow update: if isOwner(resource.data.userId);
+    }
+
+    // User Settings & Branding
+    match /user_settings/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // User Searches: Histórico de busca
+    match /user_searches/{searchId} {
+      allow read, delete: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+    }
+
+    // User Notifications
+    match /user_notifications/{notificationId} {
+      allow read, update, delete: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+    }
+
+    // Default deny
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -16,16 +16,30 @@ import { RenderJob, RenderStatus } from "@/types/render";
 export type { RenderJob, RenderStatus };
 
 /**
- * Cria um novo job de renderização
+ * Cria um novo job de renderização com verificação de projeto
  */
 export const createRenderJob = async (userId: string, projectId: string) => {
   if (!db) throw new Error("Firestore não inicializado");
+  if (!userId || !projectId) throw new Error("userId e projectId são obrigatórios para o job");
+
+  // Verificar se o projeto existe e pertence ao usuário (Blindagem)
+  const projectRef = doc(db, "projects", projectId);
+  const projectSnap = await getDoc(projectRef);
   
+  if (!projectSnap.exists()) {
+    throw new Error("Projeto não encontrado para renderização");
+  }
+  
+  const projectData = projectSnap.data();
+  if (projectData.userId !== userId) {
+    throw new Error("Acesso negado: o projeto não pertence a este usuário");
+  }
+
   const jobsRef = collection(db, "renderJobs");
   const data = {
     userId,
     projectId,
-    status: "pending",
+    status: "pending" as RenderStatus,
     progress: 0,
     outputUrl: null,
     errorMessage: null,

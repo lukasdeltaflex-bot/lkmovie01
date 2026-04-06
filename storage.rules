@@ -1,0 +1,29 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{batch}/o {
+    // Helper function to check if user is authenticated
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // Helper to check if user owns the path
+    function isOwner(userId) {
+      return isAuth() && request.auth.uid == userId;
+    }
+
+    // User renders
+    match /renders/{userId}/{allPaths=**} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Branding, Logos, Watermarks
+    match /branding/{userId}/{allPaths=**} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Default deny
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
