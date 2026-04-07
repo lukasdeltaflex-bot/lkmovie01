@@ -43,7 +43,7 @@ export interface SavedProject {
   endScreenUrl: string;
   
   // Audio
-  audioMode: "keep" | "remove" | "mix";
+  audioMode: "keep" | "remove" | "mix" | "music" | "none";
   volumeVideo: number;
   volumeMusic: number;
   musicUrl?: string;

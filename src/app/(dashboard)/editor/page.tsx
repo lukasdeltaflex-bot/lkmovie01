@@ -62,7 +62,7 @@ function EditorContent() {
   const [zoomLevel, setZoomLevel] = useState(10); 
   const [volume, setVolume] = useState(100);
   const [musicVolume, setMusicVolume] = useState(50);
-  const [audioMode, setAudioMode] = useState<"keep" | "remove" | "mix" | "none">("keep");
+  const [audioMode, setAudioMode] = useState<"keep" | "remove" | "mix" | "none" | "music">("keep");
 
   const [videoConfig, setVideoConfig] = useState({
     aspectRatio: "9:16" as AspectRatio,
@@ -204,7 +204,7 @@ function EditorContent() {
         isAutoSubtitle: false,
         channelTitle: clips[0].channel || "SaaS Creator",
         endScreenUrl: branding.defaultEndScreen || "",
-        audioMode: audioMode === "none" ? "remove" : (audioMode === "keep" ? "keep" : "mix"),
+        audioMode: audioMode,
         volumeVideo: volume / 100,
       };
 
