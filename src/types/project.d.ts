@@ -19,6 +19,7 @@ export interface SavedProject {
   title: string;
   thumbnail: string;
   channelTitle: string;
+  aspectRatio: "16:9" | "9:16" | "1:1";
   
   // Timeline (CapCut Engine)
   timeline?: TimelineEvent[];
@@ -29,6 +30,7 @@ export interface SavedProject {
   subtitleSize: number;
   subtitlePosition: string;
   subtitleType: "none" | "pt" | "en" | "both";
+  subtitleFont: string;
   isAutoSubtitle: boolean;
   
   // Watermark

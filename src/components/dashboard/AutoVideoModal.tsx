@@ -115,11 +115,13 @@ export function AutoVideoModal({ onClose }: AutoVideoModalProps) {
         videoId: bestVideo.id,
         thumbnail: bestVideo.thumbnail,
         channelTitle: bestVideo.channelTitle,
+        aspectRatio: platform === "youtube" ? "16:9" : "9:16",
         subtitleText: config.caption,
         subtitleColor: config.style.color,
         subtitleSize: config.style.size,
         subtitlePosition: config.style.position as any,
         subtitleType: "pt", // Padrão para auto-gerado
+        subtitleFont: "Inter",
         isAutoSubtitle: true,
         watermarkUrl: branding.defaultWatermark || "",
         watermarkOpacity: 60,
@@ -130,6 +132,7 @@ export function AutoVideoModal({ onClose }: AutoVideoModalProps) {
         volumeVideo: 1,
         volumeMusic: config.audio.volumeMusic || 0.6,
       });
+
 
 
       const renderJobId = await createRenderJob(user.uid, projectId);
