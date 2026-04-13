@@ -7,11 +7,10 @@ import { useAuth } from "@/context/auth-context";
 import { useBranding } from "@/context/branding-context";
 import { useSearchParams, useRouter } from "next/navigation";
 import { createProject, updateProject, getProjectById } from "@/lib/firebase/projects";
-import { createRender_job } from "@/lib/firebase/render-jobs";
+import { createRenderJob } from "@/lib/firebase/render-jobs";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import axios from "axios";
-import { SavedProject } from "@/types/project.d";
 
 type AspectRatio = "16:9" | "9:16" | "1:1";
 type EditorTab = "video" | "legendas" | "audio" | "watermark" | "exportar";
@@ -98,6 +97,32 @@ function EditorContent() {
   });
 
   const [isDragging, setIsDragging] = useState<string | null>(null);
+
+  // Carregar Projeto se houver ID
+  useEffect(() => {
+    const load = async () => {
+      if (projectId) {
+        const p = await getProjectById(projectId);
+        if (p) {
+          setVideoConfig(v => ({...v, aspectRatio: p.aspectRatio || "9:16"}));
+          setGlobalSubtitle(s => ({
+            ...s, 
+            text: p.subtitleText, 
+            color: p.subtitleColor, 
+            size: p.subtitleSize, 
+            font: p.subtitleFont || "Inter",
+            type: p.subtitleType,
+            y: p.subtitlePosition === "bottom" ? 80 : 50
+          }));
+          setWatermark(w => ({...w, url: p.watermarkUrl, opacity: p.watermarkOpacity, size: p.watermarkScale * 500}));
+          if (p.musicUrl) setSelectedMusic({ name: "Música Carregada", url: p.musicUrl });
+          setMusicVolume(p.volumeMusic * 100);
+          setVolume(p.volumeVideo * 100);
+        }
+      }
+    };
+    load();
+  }, [projectId]);
 
   // Detecção refinada da fonte do vídeo
   const activeVideoData = useMemo(() => {
@@ -362,7 +387,12 @@ function EditorContent() {
     setRenderStatus("INICIANDO RENDER PROFISSIONAL...");
     setRenderProgress(10);
     try {
-      const response = await axios.post("/api/render-video", {
+      const jobId = await createRenderJob(user.uid, id);
+      setRenderStatus("MIXANDO CAMADAS...");
+      setRenderProgress(40);
+      
+      await axios.post("/api/render-video", {
+        renderJobId: jobId,
         userId: user.uid,
         projectId: id,
         timeline: timeline,
