@@ -7,7 +7,7 @@ import { useAuth } from "@/context/auth-context";
 import { useBranding } from "@/context/branding-context";
 import { useSearchParams, useRouter } from "next/navigation";
 import { createProject, updateProject, getProjectById } from "@/lib/firebase/projects";
-import { createRenderJob } from "@/lib/firebase/render-jobs";
+import { createRender_job } from "@/lib/firebase/render-jobs";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import axios from "axios";
@@ -16,7 +16,13 @@ import { SavedProject } from "@/types/project.d";
 type AspectRatio = "16:9" | "9:16" | "1:1";
 type EditorTab = "video" | "legendas" | "audio" | "watermark" | "exportar";
 
-// Mock para Trilha Sonora
+const MOCK_SUBTITLES = [
+  { start: 0, end: 2, pt: "Bem-vindo ao LKMOVIE01!", en: "Welcome to LKMOVIE01!" },
+  { start: 2, end: 5, pt: "Este é o novo editor atualizado.", en: "This is the new updated editor." },
+  { start: 5, end: 8, pt: "As legendas acompanham o vídeo.", en: "Subtitles follow the video." },
+  { start: 8, end: 15, pt: "É possível ouvir a música de fundo.", en: "You can hear the background music." }
+];
+
 const MOCK_TRACKS = [
   { name: "Epic Cinematic", artist: "AudioHero", style: "Epic", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", viral: true },
   { name: "Lo-Fi Beats", artist: "ChillMaster", style: "Lo-Fi", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3", viral: false },
@@ -38,9 +44,12 @@ function EditorContent() {
   const { branding, showToast } = useBranding();
   const searchParams = useSearchParams();
   const router = useRouter();
+  
   const videoRef = useRef<HTMLVideoElement>(null);
+  const ytPlayerRef = useRef<any>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   
   const [activeTab, setActiveTab] = useState<EditorTab>("video");
   const [projectId, setProjectId] = useState<string | null>(searchParams.get("id"));
@@ -54,7 +63,6 @@ function EditorContent() {
   const [selectedMusic, setSelectedMusic] = useState<{ name: string; url: string; artist?: string } | null>(null);
   const [musicSearch, setMusicSearch] = useState("");
 
-  // Player & Timeline State
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(30); 
@@ -91,33 +99,113 @@ function EditorContent() {
 
   const [isDragging, setIsDragging] = useState<string | null>(null);
 
-  // Carregar Projeto se houver ID
-  useEffect(() => {
-    const load = async () => {
-      if (projectId) {
-        const p = await getProjectById(projectId);
-        if (p) {
-          setVideoConfig(v => ({...v, aspectRatio: p.aspectRatio || "9:16"}));
-          setGlobalSubtitle(s => ({
-            ...s, 
-            text: p.subtitleText, 
-            color: p.subtitleColor, 
-            size: p.subtitleSize, 
-            font: p.subtitleFont || "Inter",
-            type: p.subtitleType,
-            y: p.subtitlePosition === "bottom" ? 80 : 50
-          }));
-          setWatermark(w => ({...w, url: p.watermarkUrl, opacity: p.watermarkOpacity, size: p.watermarkScale * 500}));
-          if (p.musicUrl) setSelectedMusic({ name: "Música Carregada", url: p.musicUrl });
-          setMusicVolume(p.volumeMusic * 100);
-          setVolume(p.volumeVideo * 100);
-        }
-      }
-    };
-    load();
-  }, [projectId]);
+  // Detecção refinada da fonte do vídeo
+  const activeVideoData = useMemo(() => {
+    const currentEvent = timeline.find(e => e.type === "video" && currentTime >= e.startTime && currentTime <= e.startTime + e.duration);
+    const clip = clips[activeClipIndex];
+    const rawSource = currentEvent?.content || clip?.id || clip?.url;
 
-  // Player Sync
+    if (!rawSource) return { type: "invalid" as const };
+
+    // Regra Anti-Thumbnail: Se for imagem do YouTube, tenta buscar o ID do clip
+    if (typeof rawSource === "string" && (rawSource.includes("ytimg.com") || rawSource.includes("img.youtube.com"))) {
+      if (clip?.id) return { type: "youtube" as const, id: clip.id };
+      return { type: "invalid" as const };
+    }
+
+    const ytIdMatch = typeof rawSource === "string" ? rawSource.match(/^(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/) : null;
+    const ytIdDirect = typeof rawSource === "string" ? rawSource.match(/^[a-zA-Z0-9_-]{11}$/) : null;
+
+    if (ytIdMatch) return { type: "youtube" as const, id: ytIdMatch[1] };
+    if (ytIdDirect) return { type: "youtube" as const, id: rawSource as string };
+
+    if (typeof rawSource === "string" && (rawSource.match(/\.(mp4|webm|ogg)$/i) || rawSource.startsWith("blob:"))) {
+      return { type: "file" as const, url: rawSource };
+    }
+
+    if (clip?.id && clip.id.length === 11) return { type: "youtube" as const, id: clip.id };
+
+    return { type: "invalid" as const };
+  }, [timeline, currentTime, clips, activeClipIndex]);
+
+  // Carregar YouTube API
+  useEffect(() => {
+    if (typeof window !== "undefined" && !(window as any).YT) {
+      const tag = document.createElement("script");
+      tag.src = "https://www.youtube.com/iframe_api";
+      const firstScriptTag = document.getElementsByTagName("script")[0];
+      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+    }
+  }, []);
+
+  // Sync YouTube Player
+  useEffect(() => {
+    if (activeVideoData.type === "youtube" && activeVideoData.id) {
+       const initYT = () => {
+          if (ytPlayerRef.current) {
+             if (ytPlayerRef.current.loadVideoById) {
+                ytPlayerRef.current.loadVideoById(activeVideoData.id);
+             }
+             return;
+          }
+          ytPlayerRef.current = new (window as any).YT.Player("youtube-player", {
+             height: "100%",
+             width: "100%",
+             videoId: activeVideoData.id,
+             playerVars: {
+                autoplay: 0,
+                controls: 0,
+                disablekb: 1,
+                fs: 0,
+                modestbranding: 1,
+                rel: 0,
+                showinfo: 0,
+                iv_load_policy: 3,
+                enablejsapi: 1
+             },
+             events: {
+                onReady: (event: any) => {
+                   event.target.seekTo(currentTime, true);
+                   if (isPlaying) event.target.playVideo();
+                },
+                onStateChange: (event: any) => {
+                   if (event.data === (window as any).YT.PlayerState.PLAYING) setIsPlaying(true);
+                   else if (event.data === (window as any).YT.PlayerState.PAUSED) setIsPlaying(false);
+                }
+             }
+          });
+       };
+
+       if (!(window as any).YT || !(window as any).YT.Player) {
+          const checkYT = setInterval(() => {
+             if ((window as any).YT && (window as any).YT.Player) {
+                clearInterval(checkYT);
+                initYT();
+             }
+          }, 100);
+          return () => clearInterval(checkYT);
+       } else {
+          initYT();
+       }
+    } else {
+       ytPlayerRef.current = null;
+    }
+  }, [activeVideoData.type, activeVideoData.id]);
+
+  // Polling para sincronização de tempo do YouTube
+  useEffect(() => {
+    let interval: any;
+    if (isPlaying && activeVideoData.type === "youtube" && ytPlayerRef.current?.getCurrentTime) {
+      interval = setInterval(() => {
+        const time = ytPlayerRef.current.getCurrentTime();
+        setCurrentTime(time);
+        if (duration < time) setDuration(ytPlayerRef.current.getDuration());
+      }, 100);
+    }
+    return () => clearInterval(interval);
+  }, [isPlaying, activeVideoData.type]);
+
+  // Player Sync HTML5
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -132,22 +220,50 @@ function EditorContent() {
       video.removeEventListener("timeupdate", updateTime);
       video.removeEventListener("loadedmetadata", updateDuration);
     };
-  }, []);
+  }, [activeVideoData.type]);
 
   const togglePlay = () => {
-    if (videoRef.current) {
-      if (isPlaying) videoRef.current.pause();
-      else videoRef.current.play();
+    if (activeVideoData.type === "youtube" && ytPlayerRef.current) {
+       if (isPlaying) ytPlayerRef.current.pauseVideo();
+       else ytPlayerRef.current.playVideo();
+       setIsPlaying(!isPlaying);
+       if (audioRef.current && (audioMode === "mix" || audioMode === "music")) {
+          if (isPlaying) audioRef.current.pause();
+          else audioRef.current.play();
+       }
+    } else if (videoRef.current) {
+      if (isPlaying) {
+        videoRef.current.pause();
+        if (audioRef.current) audioRef.current.pause();
+      }
+      else {
+        videoRef.current.play();
+        if (audioRef.current && (audioMode === "mix" || audioMode === "music")) audioRef.current.play();
+      }
       setIsPlaying(!isPlaying);
     }
   };
 
   const handleSeek = (newTime: number) => {
-    if (videoRef.current) {
+    if (activeVideoData.type === "youtube" && ytPlayerRef.current) {
+       ytPlayerRef.current.seekTo(newTime, true);
+       setCurrentTime(newTime);
+    } else if (videoRef.current) {
       videoRef.current.currentTime = newTime;
       setCurrentTime(newTime);
     }
+    if (audioRef.current) {
+      audioRef.current.currentTime = newTime;
+    }
   };
+
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.volume = volume / 100;
+  }, [volume]);
+
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = musicVolume / 100;
+  }, [musicVolume]);
 
   const handleTimelineClick = (e: React.MouseEvent) => {
     if (!timelineRef.current) return;
@@ -246,12 +362,7 @@ function EditorContent() {
     setRenderStatus("INICIANDO RENDER PROFISSIONAL...");
     setRenderProgress(10);
     try {
-      const jobId = await createRenderJob(user.uid, id);
-      setRenderStatus("MIXANDO CAMADAS...");
-      setRenderProgress(40);
-      
-      await axios.post("/api/render-video", {
-        renderJobId: jobId,
+      const response = await axios.post("/api/render-video", {
         userId: user.uid,
         projectId: id,
         timeline: timeline,
@@ -273,11 +384,6 @@ function EditorContent() {
     }
   };
 
-  const activeVideoContent = useMemo(() => {
-    const currentEvent = timeline.find(e => e.type === "video" && currentTime >= e.startTime && currentTime <= e.startTime + e.duration);
-    return currentEvent?.content || (clips[activeClipIndex]?.thumbnail);
-  }, [timeline, currentTime, clips, activeClipIndex]);
-
   const filteredTracks = useMemo(() => {
     return MOCK_TRACKS.filter(t => 
       t.name.toLowerCase().includes(musicSearch.toLowerCase()) || 
@@ -288,6 +394,10 @@ function EditorContent() {
 
   return (
     <div className="h-[92vh] flex flex-col bg-[#0a0a0a] text-white overflow-hidden select-none">
+      
+      <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700;900&family=Montserrat:wght@400;700;900&family=Poppins:wght@400;700;900&family=Roboto:wght@400;700;900&display=swap" rel="stylesheet" />
+      {selectedMusic && <audio ref={audioRef} src={selectedMusic.url} loop />}
+      
       {isRendering && (
          <div className="fixed inset-0 z-1000 bg-black/95 flex flex-col items-center justify-center animate-in fade-in duration-500">
             <div className="w-24 h-24 border-8 border-blue-600 border-t-transparent animate-spin rounded-full mb-10"></div>
@@ -303,11 +413,11 @@ function EditorContent() {
             <Link href="/dashboard" className="text-gray-500 hover:text-white transition-colors">← Voltar</Link>
             <div className="h-4 w-px bg-white/10 mx-2"></div>
             <h1 className="text-sm font-bold uppercase tracking-widest">{clips[0]?.title || "Novo Projeto"}</h1>
-            {lastSaved && <span className="text-[10px] text-gray-500">Salvo às {lastSaved.toLocaleTimeString()}</span>}
+            {lastSaved && <span className="text-sm text-gray-500">Salvo às {lastSaved.toLocaleTimeString()}</span>}
          </div>
          <div className="flex items-center gap-3">
-            <Button variant="outline" className="h-9 px-4 border-white/10 text-[10px] font-bold" onClick={handleSaveProject} disabled={isSaving}>SALVAR RASCUNHO</Button>
-            <Button className="h-9 px-6 bg-blue-600 text-[10px] font-black hover:bg-blue-700 shadow-lg shadow-blue-600/20" onClick={handleGenerateVideo}>EXPORTAR VÍDEO 🚀</Button>
+            <Button variant="outline" className="h-9 px-4 border-white/10 text-sm font-bold" onClick={handleSaveProject} disabled={isSaving}>SALVAR RASCUNHO</Button>
+            <Button className="h-9 px-6 bg-blue-600 text-sm font-black hover:bg-blue-700 shadow-lg shadow-blue-600/20" onClick={handleGenerateVideo}>EXPORTAR VÍDEO 🚀</Button>
          </div>
       </header>
 
@@ -315,26 +425,45 @@ function EditorContent() {
          <div className="flex-1 flex flex-col bg-black relative overflow-hidden">
             <div 
               ref={videoContainerRef}
-              className="relative mx-auto mt-10 shadow-2xl transition-all duration-500 border border-white/5 bg-[#111]"
+              className="relative mx-auto mt-10 shadow-2xl transition-all duration-500 border border-white/5 bg-[#111] overflow-hidden"
               style={{ 
                 aspectRatio: videoConfig.aspectRatio.replace(':', '/'),
-                height: '60%',
+                height: '75%',
                 maxWidth: '90%'
               }}
               onPointerMove={handlePointerMove}
               onPointerUp={() => setIsDragging(null)}
             >
-               <video 
-                 ref={videoRef}
-                 src={activeVideoContent} 
-                 className="w-full h-full object-cover"
-                 style={{ transform: `scale(${videoConfig.zoom / 100})` }}
-                 muted={audioMode === "none" || audioMode === "music"}
-               />
+               {activeVideoData.type === "youtube" ? (
+                  <div className="w-full h-full pointer-events-none" style={{ transform: `scale(${videoConfig.zoom / 100})` }}>
+                     <div id="youtube-player"></div>
+                  </div>
+               ) : activeVideoData.type === "file" ? (
+                  <video 
+                    ref={videoRef}
+                    src={activeVideoData.url} 
+                    className="w-full h-full object-cover"
+                    style={{ transform: `scale(${videoConfig.zoom / 100})` }}
+                    muted={audioMode === "none" || audioMode === "music"}
+                  />
+               ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-900/50 border-2 border-dashed border-white/5 p-10 text-center">
+                     <span className="text-5xl mb-6">🎬</span>
+                     <span className="text-lg font-black text-white uppercase tracking-widest italic">Fonte de Vídeo Indisponível</span>
+                     <p className="text-xs text-gray-500 mt-4 max-w-xs uppercase font-bold leading-relaxed">
+                        Selecione uma cena real na biblioteca <br/> para iniciar sua edição cinematográfica.
+                     </p>
+                  </div>
+               )}
 
                {videoConfig.safeZones && videoConfig.aspectRatio === "9:16" && (
-                 <div className="absolute inset-0 pointer-events-none border border-white/5 mix-blend-overlay">
-                    <div className="absolute inset-x-0 top-[15%] bottom-[15%] border-y border-white/10"></div>
+                 <div className="absolute inset-x-0 inset-y-0 pointer-events-none z-50 flex flex-col justify-between">
+                   <div className="h-[15%] w-full bg-red-500/20 border-b border-red-500 flex items-center justify-center">
+                     <span className="text-white font-black text-xs uppercase drop-shadow-md shadow-black">Inseguro (UI Superior)</span>
+                   </div>
+                   <div className="h-[25%] w-full bg-red-500/20 border-t border-red-500 flex items-center justify-center">
+                     <span className="text-white font-black text-xs uppercase drop-shadow-md shadow-black">Inseguro (UI Inferior)</span>
+                   </div>
                  </div>
                )}
 
@@ -346,13 +475,13 @@ function EditorContent() {
                  >
                     {(globalSubtitle.type === "pt" || globalSubtitle.type === "both") && (
                       <div className="px-6 py-2 rounded-lg bg-black/40 backdrop-blur-md border border-white/10 text-center font-black italic uppercase shadow-2xl"
-                           style={{ color: globalSubtitle.color, fontSize: `${globalSubtitle.size}px`, fontFamily: globalSubtitle.font }}>
+                           style={{ color: globalSubtitle.color, fontSize: `${globalSubtitle.size}px`, fontFamily: `"${globalSubtitle.font}", sans-serif` }}>
                         {globalSubtitle.text}
                       </div>
                     )}
                     {(globalSubtitle.type === "en" || globalSubtitle.type === "both") && (
                       <div className="px-4 py-1.5 rounded-lg bg-yellow-500 text-black text-center font-black italic uppercase shadow-xl"
-                           style={{ fontSize: `${globalSubtitle.size * 0.75}px`, fontFamily: globalSubtitle.font }}>
+                           style={{ fontSize: `${globalSubtitle.size * 0.75}px`, fontFamily: `"${globalSubtitle.font}", sans-serif` }}>
                         {globalSubtitle.textEn}
                       </div>
                     )}
@@ -387,7 +516,7 @@ function EditorContent() {
                      <div className="absolute top-0 left-0 h-full bg-blue-600 rounded-full" style={{ width: `${(currentTime/duration)*100}%` }}></div>
                      <div className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg" style={{ left: `${(currentTime/duration)*100}%` }}></div>
                   </div>
-                  <div className="flex justify-between text-[9px] font-black text-gray-500 uppercase tracking-widest">
+                  <div className="flex justify-between text-xs font-black text-gray-500 uppercase tracking-widest">
                      <span>{Math.floor(currentTime / 60)}:{(Math.floor(currentTime % 60)).toString().padStart(2, '0')}</span>
                      <span className="text-gray-300">STUDIO PREVIEW MODE</span>
                      <span>{Math.floor(duration / 60)}:{(Math.floor(duration % 60)).toString().padStart(2, '0')}s</span>
@@ -396,13 +525,13 @@ function EditorContent() {
             </div>
          </div>
 
-         <div className="w-[360px] border-l border-white/10 bg-[#0d0d0d] flex flex-col shadow-2xl z-40">
+         <div className="w-[420px] border-l border-white/10 bg-[#0d0d0d] flex flex-col shadow-2xl z-40">
             <div className="grid grid-cols-5 border-b border-white/5">
                 {(["video", "legendas", "audio", "watermark", "exportar"] as EditorTab[]).map(tab => (
                   <button 
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`flex flex-col items-center justify-center py-4 text-[8px] font-black uppercase tracking-tighter transition-all gap-1 ${activeTab === tab ? 'text-blue-500 bg-white/5 border-b-2 border-blue-500' : 'text-gray-500 hover:text-gray-300'}`}
+                    className={`flex flex-col items-center justify-center py-4 text-sm font-black uppercase tracking-tighter transition-all gap-1 ${activeTab === tab ? 'text-blue-500 bg-white/5 border-b-2 border-blue-500' : 'text-gray-500 hover:text-gray-300'}`}
                   >
                     <span className="text-sm">{tab === 'video' ? '📺' : tab === 'legendas' ? '💬' : tab === 'audio' ? '🎵' : tab === 'watermark' ? '🏷️' : '🚀'}</span>
                     {tab.slice(0, 4)}
@@ -414,18 +543,18 @@ function EditorContent() {
                {activeTab === "video" && (
                  <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
                     <div className="space-y-4">
-                       <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest italic">Formato do Clip</label>
+                       <label className="text-sm font-black text-gray-500 uppercase tracking-widest italic">Formato do Clip</label>
                        <div className="grid grid-cols-3 gap-3">
                           {(["16:9", "9:16", "1:1"] as AspectRatio[]).map(r => (
                              <button key={r} onClick={() => setVideoConfig(v => ({...v, aspectRatio: r}))} className={`py-5 rounded-2xl border-2 flex flex-col items-center gap-2 transition-all ${videoConfig.aspectRatio === r ? 'border-blue-600 bg-blue-600/10 text-blue-500 shadow-xl' : 'border-white/5 bg-white/5 text-gray-600 hover:border-white/10'}`}>
-                                <div className={`border-2 ${r === '16:9' ? 'w-6 h-3.5' : r === '9:16' ? 'w-3.5 h-6' : 'w-5 h-5'} border-current rounded-sm`}></div>
-                                <span className="text-[8px] font-black">{r}</span>
+                                 <div className={`border-2 ${r === '16:9' ? 'w-6 h-3.5' : r === '9:16' ? 'w-3.5 h-6' : 'w-5 h-5'} border-current rounded-sm`}></div>
+                                 <span className="text-sm font-black">{r}</span>
                              </button>
                           ))}
                        </div>
                     </div>
                     <div className="space-y-4">
-                       <label className="text-[10px] font-black text-gray-500 uppercase flex justify-between">
+                       <label className="text-sm font-black text-gray-500 uppercase flex justify-between">
                           <span>Zoom Preview</span>
                           <span className="text-blue-500">{videoConfig.zoom}%</span>
                        </label>
@@ -433,10 +562,10 @@ function EditorContent() {
                     </div>
                     <div className="p-4 bg-blue-600/5 rounded-2xl border border-blue-600/10 space-y-3">
                        <div className="flex items-center justify-between">
-                          <label className="text-[9px] font-black uppercase text-gray-300">Grade de Segurança</label>
+                          <label className="text-xs font-black uppercase text-gray-300">Grade de Segurança</label>
                           <input type="checkbox" checked={videoConfig.safeZones} onChange={e => setVideoConfig(v => ({...v, safeZones: e.target.checked}))} className="w-4 h-4 rounded border-white/10 accent-blue-600" />
                        </div>
-                       <p className="text-[8px] text-gray-500 leading-relaxed font-bold">Ative para garantir que suas legendas não sejam cobertas pela interface do TikTok/Instagram.</p>
+                       <p className="text-sm text-gray-500 leading-relaxed font-bold">Ative para garantir que suas legendas não sejam cobertas pela interface do TikTok/Instagram.</p>
                     </div>
                  </div>
                )}
@@ -446,7 +575,7 @@ function EditorContent() {
                     <Button 
                       onClick={handleGenerateAISubtitles}
                       disabled={isGeneratingSubtitles}
-                      className="w-full py-6 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl active:scale-95 transition-all disabled:opacity-50"
+                      className="w-full py-6 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all disabled:opacity-50"
                     >
                       {isGeneratingSubtitles ? "ESTUDANDO VÍDEO..." : "Sugerir Legendas com IA ✨"}
                     </Button>
@@ -455,24 +584,24 @@ function EditorContent() {
                       <div className="space-y-3">
                         {subtitleSuggestions.map((s, i) => (
                           <button key={i} onClick={() => setGlobalSubtitle(prev => ({ ...prev, text: s.pt, textEn: s.en }))} className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl text-left hover:bg-blue-600/10 hover:border-blue-500/30 transition-all group">
-                            <div className="text-[10px] font-black group-hover:text-blue-400 leading-tight">{s.pt}</div>
-                            <div className="text-[8px] text-gray-500 mt-1 uppercase italic tracking-tighter">{s.en}</div>
+                            <div className="text-sm font-black group-hover:text-blue-400 leading-tight">{s.pt}</div>
+                            <div className="text-sm text-gray-500 mt-1 uppercase italic tracking-tighter">{s.en}</div>
                           </button>
                         ))}
                       </div>
                     )}
                     
                     <div className="space-y-4">
-                       <label className="text-[10px] font-black text-gray-500 uppercase">Estilo de Texto</label>
+                       <label className="text-sm font-black text-gray-500 uppercase">Estilo de Texto</label>
                        <div className="space-y-4 p-5 bg-white/5 rounded-2xl border border-white/5">
                           <div className="space-y-2">
-                             <label className="text-[8px] text-gray-600 font-black uppercase">Fonte</label>
-                             <select value={globalSubtitle.font} onChange={e => setGlobalSubtitle(s => ({...s, font: e.target.value}))} className="w-full bg-black border border-white/10 rounded-xl h-10 px-3 text-[10px] font-bold outline-none focus:border-blue-500">
+                             <label className="text-sm text-gray-600 font-black uppercase">Fonte</label>
+                             <select value={globalSubtitle.font} onChange={e => setGlobalSubtitle(s => ({...s, font: e.target.value}))} className="w-full bg-black border border-white/10 rounded-xl h-10 px-3 text-sm font-bold outline-none focus:border-blue-500">
                                 {["Inter", "Arial", "Montserrat", "Poppins", "Bebas Neue", "Roboto"].map(f => <option key={f} value={f}>{f}</option>)}
                              </select>
                           </div>
                           <div className="space-y-3">
-                             <label className="text-[8px] text-gray-600 font-black uppercase">Paleta Profissional</label>
+                             <label className="text-sm text-gray-600 font-black uppercase">Paleta Profissional</label>
                              <div className="flex flex-wrap gap-2">
                                 {["#ffffff", "#fbbf24", "#ef4444", "#3b82f6", "#10b981", "#ec4899", "#f97316"].map(c => (
                                   <button key={c} onClick={() => setGlobalSubtitle(s => ({...s, color: c}))} className={`w-7 h-7 rounded-full border-2 transition-all ${globalSubtitle.color === c ? 'border-blue-500 scale-125' : 'border-transparent'}`} style={{ backgroundColor: c }} />
@@ -487,10 +616,10 @@ function EditorContent() {
                     </div>
 
                     <div className="space-y-3">
-                       <label className="text-[10px] font-black text-gray-500 uppercase">Exibição Dual</label>
+                       <label className="text-sm font-black text-gray-500 uppercase">Exibição Dual</label>
                        <div className="grid grid-cols-2 gap-2">
                           {["pt", "en", "both", "none"].map(type => (
-                            <button key={type} onClick={() => setGlobalSubtitle(s => ({...s, type: type as any}))} className={`py-4 rounded-xl border text-[9px] font-black uppercase transition-all ${globalSubtitle.type === type ? 'border-blue-500 bg-blue-500/10 text-blue-500 shadow-lg shadow-blue-500/10' : 'border-white/5 bg-white/5 text-gray-600'}`}>{type === 'both' ? 'Dual (PT+EN)' : type === 'pt' ? 'BR' : type === 'en' ? 'EN' : 'SEM'}</button>
+                             <button key={type} onClick={() => setGlobalSubtitle(s => ({...s, type: type as any}))} className={`py-4 rounded-xl border text-xs font-black uppercase transition-all ${globalSubtitle.type === type ? 'border-blue-500 bg-blue-500/10 text-blue-500 shadow-lg shadow-blue-500/10' : 'border-white/5 bg-white/5 text-gray-600'}`}>{type === 'both' ? 'Dual (PT+EN)' : type === 'pt' ? 'BR' : type === 'en' ? 'EN' : 'SEM'}</button>
                           ))}
                        </div>
                     </div>
@@ -500,7 +629,7 @@ function EditorContent() {
                {activeTab === "audio" && (
                  <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
                     <div className="space-y-4">
-                       <label className="text-[10px] font-black text-gray-500 uppercase">Mixagem de Áudio</label>
+                       <label className="text-sm font-black text-gray-500 uppercase">Mixagem de Áudio</label>
                        <div className="grid grid-cols-2 gap-2">
                           {[
                             {id: "keep", label: "Som Original", icon: "🎞️"},
@@ -510,7 +639,7 @@ function EditorContent() {
                           ].map(mode => (
                              <button key={mode.id} onClick={() => setAudioMode(mode.id as any)} className={`p-4 rounded-2xl border-2 flex flex-col items-center gap-2 transition-all ${audioMode === mode.id ? 'border-blue-600 bg-blue-600/10 text-blue-500' : 'border-white/5 bg-white/5 text-gray-600'}`}>
                                 <span className="text-lg">{mode.icon}</span>
-                                <span className="text-[8px] font-black uppercase tracking-tighter">{mode.label}</span>
+                                <span className="text-sm font-black uppercase tracking-tighter">{mode.label}</span>
                              </button>
                           ))}
                        </div>
@@ -518,18 +647,18 @@ function EditorContent() {
 
                     {(audioMode === "keep" || audioMode === "mix") && (
                       <div className="space-y-3 p-5 bg-white/5 rounded-2xl border border-white/5">
-                         <div className="flex justify-between items-center text-[8px] font-black text-gray-500 mb-1">
+                         <div className="flex justify-between items-center text-sm font-black text-gray-500 mb-1">
                             <span>VOLUME VÍDEO</span>
                             <span>{volume}%</span>
                          </div>
                          <input type="range" min="0" max="150" value={volume} onChange={(e) => setVolume(parseInt(e.target.value))} className="w-full bg-black/40 rounded-full accent-white h-1.5" />
-                         <Button variant="ghost" className="w-full h-8 text-[8px] font-black text-red-500 uppercase" onClick={() => setVolume(0)}>Mutar Original</Button>
+                         <Button variant="ghost" className="w-full h-8 text-sm font-black text-red-500 uppercase" onClick={() => setVolume(0)}>Mutar Original</Button>
                       </div>
                     )}
 
                     <div className="space-y-4">
                        <div className="space-y-1">
-                          <label className="text-[10px] font-black text-gray-500 uppercase italic">Biblioteca de Trilhas</label>
+                          <label className="text-sm font-black text-gray-500 uppercase italic">Biblioteca de Trilhas</label>
                           <input 
                             type="text" 
                             placeholder="Buscar música, artista ou estilo..." 
@@ -545,11 +674,11 @@ function EditorContent() {
                                <div className="flex items-center gap-3">
                                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs ${m.viral ? 'bg-pink-500/20 text-pink-500' : 'bg-white/10'}`}>{m.viral ? '🔥' : '🎶'}</div>
                                   <div>
-                                     <div className="text-[10px] font-black leading-none">{m.name}</div>
-                                     <div className="text-[8px] text-gray-600 mt-1 uppercase font-bold">{m.artist} • {m.style}</div>
+                                     <div className="text-sm font-black leading-none">{m.name}</div>
+                                     <div className="text-sm text-gray-600 mt-1 uppercase font-bold">{m.artist} • {m.style}</div>
                                   </div>
                                </div>
-                               {selectedMusic?.url === m.url ? <span className="text-[8px] font-black text-blue-500 uppercase">ATIVA</span> : <span className="text-[8px] font-black text-gray-700 uppercase">USAR</span>}
+                               {selectedMusic?.url === m.url ? <span className="text-sm font-black text-blue-500 uppercase">ATIVA</span> : <span className="text-sm font-black text-gray-700 uppercase">USAR</span>}
                             </div>
                           ))}
                        </div>
@@ -557,12 +686,12 @@ function EditorContent() {
 
                     {selectedMusic && (
                       <div className="space-y-3 p-5 bg-blue-600/5 rounded-2xl border border-blue-600/20">
-                         <div className="flex justify-between items-center text-[8px] font-black text-blue-300 mb-1">
+                         <div className="flex justify-between items-center text-sm font-black text-blue-300 mb-1">
                             <span>VOLUME TRILHA</span>
                             <span>{musicVolume}%</span>
                          </div>
                          <input type="range" min="0" max="100" value={musicVolume} onChange={(e) => setMusicVolume(parseInt(e.target.value))} className="w-full bg-black/40 rounded-full accent-blue-500 h-1.5" />
-                         <Button variant="ghost" className="w-full h-8 text-[8px] font-black text-gray-500 uppercase" onClick={() => { setSelectedMusic(null); setAudioMode("keep"); }}>Remover Trilha</Button>
+                         <Button variant="ghost" className="w-full h-8 text-sm font-black text-gray-500 uppercase" onClick={() => { setSelectedMusic(null); setAudioMode("keep"); }}>Remover Trilha</Button>
                       </div>
                     )}
                  </div>
@@ -571,40 +700,40 @@ function EditorContent() {
                {activeTab === "watermark" && (
                  <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
                     <div className="space-y-4">
-                       <label className="text-[10px] font-black text-gray-500 uppercase">Marca d'Água / Logo</label>
+                       <label className="text-sm font-black text-gray-500 uppercase">Marca d'Água / Logo</label>
                        <div className="grid grid-cols-1 gap-4">
                           <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-white/10 hover:border-blue-500/50 bg-white/5 rounded-3xl cursor-pointer transition-all group overflow-hidden">
                              {watermark.url ? (
                                 <div className="relative w-full h-full p-4 flex items-center justify-center">
                                    <img src={watermark.url} className="max-w-full max-h-full object-contain drop-shadow-xl" />
                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                                      <span className="text-[8px] font-black uppercase">Trocar Imagem</span>
+                                      <span className="text-sm font-black uppercase">Trocar Imagem</span>
                                    </div>
                                 </div>
                              ) : (
                                 <>
                                    <span className="text-2xl mb-2">📁</span>
-                                   <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Clique para subir Logo</span>
+                                   <span className="text-xs font-black text-gray-500 uppercase tracking-widest">Clique para subir Logo</span>
                                 </>
                              )}
                              <input type="file" className="hidden" accept="image/*" onChange={handleWatermarkUpload} />
                           </label>
-                          {watermark.url && <Button variant="ghost" className="h-8 text-[8px] font-black text-red-500 uppercase" onClick={() => setWatermark(w => ({...w, url: ""}))}>Remover Marca</Button>}
+                          {watermark.url && <Button variant="ghost" className="h-8 text-sm font-black text-red-500 uppercase" onClick={() => setWatermark(w => ({...w, url: ""}))}>Remover Marca</Button>}
                        </div>
                     </div>
 
                     {watermark.url && (
                        <div className="space-y-6 p-6 bg-white/5 rounded-3xl border border-white/5">
                           <div className="space-y-4">
-                             <label className="text-[9px] font-black text-gray-500 uppercase flex justify-between">Escala <span>{watermark.size}px</span></label>
+                             <label className="text-xs font-black text-gray-500 uppercase flex justify-between">Escala <span>{watermark.size}px</span></label>
                              <input type="range" min="30" max="250" value={watermark.size} onChange={e => setWatermark(w => ({...w, size: parseInt(e.target.value)}))} className="w-full bg-black/40 rounded-full accent-white h-1.5" />
                           </div>
                           <div className="space-y-4">
-                             <label className="text-[9px] font-black text-gray-500 uppercase flex justify-between">Opacidade <span>{watermark.opacity}%</span></label>
+                             <label className="text-xs font-black text-gray-500 uppercase flex justify-between">Opacidade <span>{watermark.opacity}%</span></label>
                              <input type="range" min="10" max="100" value={watermark.opacity} onChange={e => setWatermark(w => ({...w, opacity: parseInt(e.target.value)}))} className="w-full bg-black/40 rounded-full accent-white h-1.5" />
                           </div>
                           <div className="pt-4 border-t border-white/5">
-                             <p className="text-[8px] text-gray-500 font-bold uppercase text-center italic">Arraste a logo no preview para posicionar</p>
+                             <p className="text-sm text-gray-500 font-bold uppercase text-center italic">Arraste a logo no preview para posicionar</p>
                           </div>
                        </div>
                     )}
@@ -616,11 +745,11 @@ function EditorContent() {
                     <div className="w-20 h-20 bg-blue-600/10 rounded-full flex items-center justify-center mx-auto mb-6 text-3xl">🚀</div>
                     <div className="space-y-2">
                        <h3 className="text-xl font-black uppercase italic tracking-tighter">Pronto para o Viral?</h3>
-                       <p className="text-[10px] text-gray-500 font-bold uppercase max-w-[200px] mx-auto leading-relaxed">Sua edição será processada em 4K nos nossos servidores de alta performance.</p>
+                       <p className="text-sm text-gray-500 font-bold uppercase max-w-[200px] mx-auto leading-relaxed">Sua edição será processada em 4K nos nossos servidores de alta performance.</p>
                     </div>
                     <Button onClick={handleGenerateVideo} className="w-full h-16 rounded-[2rem] bg-blue-600 font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-blue-600/40 hover:scale-[1.02] transition-all">RENDERIZAR VÍDEO 🎬</Button>
                     <div className="pt-10 flex flex-col gap-3">
-                       <Button variant="outline" className="w-full h-12 border-white/10 text-[10px] font-black text-gray-500 uppercase" onClick={handleSaveProject}>Apenas Salvar Rascunho</Button>
+                       <Button variant="outline" className="w-full h-12 border-white/10 text-sm font-black text-gray-500 uppercase" onClick={handleSaveProject}>Apenas Salvar Rascunho</Button>
                     </div>
                  </div>
                )}
@@ -630,14 +759,14 @@ function EditorContent() {
 
       <div className="h-[200px] border-t border-white/5 bg-[#0a0a0a] flex flex-col relative">
          <div className="h-8 flex items-center border-b border-white/5 px-6 bg-[#111]">
-            <div className="flex-1 flex gap-6 text-[9px] font-black text-gray-500 uppercase overflow-x-auto no-scrollbar">
+            <div className="flex-1 flex gap-6 text-xs font-black text-gray-500 uppercase overflow-x-auto no-scrollbar">
                <button className="hover:text-white flex items-center gap-1 transition-colors">✂️ Cortar</button>
                <button className="hover:text-white flex items-center gap-1 transition-colors">🗑 Deletar</button>
                <button className="hover:text-white flex items-center gap-1 transition-colors">↩️ Desfazer</button>
                <button className="hover:text-white flex items-center gap-1 transition-colors">📋 Duplicar</button>
             </div>
             <div className="flex items-center gap-3">
-               <span className="text-[8px] font-black text-gray-600">ZOOM</span>
+               <span className="text-sm font-black text-gray-600">ZOOM</span>
                <input type="range" min="5" max="40" value={zoomLevel} onChange={(e) => setZoomLevel(parseInt(e.target.value))} className="w-24 h-1 bg-white/5 rounded-full accent-white" />
             </div>
          </div>
@@ -660,7 +789,7 @@ function EditorContent() {
                   <div className="w-8 h-10 flex items-center justify-center text-[7px] font-black text-gray-700 bg-white/5 rounded-md">V1</div>
                   <div className="h-10 bg-blue-600/20 border border-blue-600/30 rounded-xl relative overflow-hidden flex items-center" style={{ width: `${duration * zoomLevel}px` }}>
                      {timeline.filter(e => e.type === "video").map(ev => (
-                        <div key={ev.id} className="h-8 bg-blue-600 rounded-lg border border-white/20 flex items-center px-3 text-[8px] font-black shadow-lg mx-1" style={{ width: `${ev.duration * zoomLevel - 8}px` }}>
+                        <div key={ev.id} className="h-8 bg-blue-600 rounded-lg border border-white/20 flex items-center px-3 text-sm font-black shadow-lg mx-1" style={{ width: `${ev.duration * zoomLevel - 8}px` }}>
                            {ev.id.toUpperCase()}
                         </div>
                      ))}
@@ -710,7 +839,7 @@ export default function EditorPage() {
            <div className="w-16 h-16 border-4 border-blue-600/20 border-t-blue-600 animate-spin rounded-full"></div>
            <div className="absolute inset-0 flex items-center justify-center text-xs">🚀</div>
         </div>
-        <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em] animate-pulse">Iniciando Studio Pro v2...</p>
+        <p className="text-sm font-black text-gray-500 uppercase tracking-[0.3em] animate-pulse">Iniciando Studio Pro v2...</p>
       </div>
     }>
       <EditorContent />

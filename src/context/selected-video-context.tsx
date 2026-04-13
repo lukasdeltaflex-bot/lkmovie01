@@ -57,7 +57,7 @@ export function SelectedVideoProvider({ children }: { children: ReactNode }) {
       type: "video",
       startTime: timeline.reduce((acc, ev) => Math.max(acc, ev.startTime + ev.duration), 0),
       duration: 15,
-      content: video.thumbnail,
+      content: video.id, // Armazena o ID (YouTube) ou URL, não o thumbnail
       track: 0,
       metadata: { videoId: video.id }
     });
