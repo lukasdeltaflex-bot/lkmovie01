@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, ReactNode, useEffect } from
 import { YouTubeVideo } from "@/lib/youtube/search-videos";
 
 interface VideoClip extends YouTubeVideo {
+  url?: string;
   startTime?: number;
   endTime?: number;
   zoom?: number;
