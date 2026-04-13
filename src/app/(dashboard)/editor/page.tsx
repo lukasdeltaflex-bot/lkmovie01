@@ -422,6 +422,14 @@ function EditorContent() {
     );
   }, [musicSearch]);
 
+  // Subtitle Synchronization Logic
+  const currentSubtitleObj = useMemo(() => {
+    return MOCK_SUBTITLES.find(s => currentTime >= s.start && currentTime <= s.end);
+  }, [currentTime]);
+
+  const activeSubtitleText = currentSubtitleObj?.pt || globalSubtitle.text;
+  const activeSubtitleTextEn = currentSubtitleObj?.en || globalSubtitle.textEn;
+
   return (
     <div className="h-[92vh] flex flex-col bg-[#0a0a0a] text-white overflow-hidden select-none">
       
@@ -438,7 +446,7 @@ function EditorContent() {
          </div>
       )}
 
-      <header className="h-16 border-b border-white/5 flex items-center justify-between px-6 bg-[#111] z-50">
+      <header className="h-16 border-b border-white/5 flex items-center justify-between px-6 bg-[#111] z-50 shadow-md">
          <div className="flex items-center gap-4">
             <Link href="/dashboard" className="text-gray-500 hover:text-white transition-colors">← Voltar</Link>
             <div className="h-4 w-px bg-white/10 mx-2"></div>
@@ -452,150 +460,173 @@ function EditorContent() {
       </header>
 
       <div className="flex-1 flex overflow-hidden">
+         {/* Main Preview Area */}
          <div className="flex-1 flex flex-col bg-black relative overflow-hidden">
-            <div 
-              ref={videoContainerRef}
-              className="relative mx-auto mt-10 shadow-2xl transition-all duration-500 border border-white/5 bg-[#111] overflow-hidden"
-              style={{ 
-                aspectRatio: videoConfig.aspectRatio.replace(':', '/'),
-                height: '75%',
-                maxWidth: '90%'
-              }}
-              onPointerMove={handlePointerMove}
-              onPointerUp={() => setIsDragging(null)}
-            >
-               {activeVideoData.type === "youtube" ? (
-                  <div className="w-full h-full pointer-events-none" style={{ transform: `scale(${videoConfig.zoom / 100})` }}>
-                     <div id="youtube-player"></div>
-                  </div>
-               ) : activeVideoData.type === "file" ? (
-                  <video 
-                    ref={videoRef}
-                    src={activeVideoData.url} 
-                    className="w-full h-full object-cover"
-                    style={{ transform: `scale(${videoConfig.zoom / 100})` }}
-                    muted={audioMode === "none" || audioMode === "music"}
-                  />
-               ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-900/50 border-2 border-dashed border-white/5 p-10 text-center">
-                     <span className="text-5xl mb-6">🎬</span>
-                     <span className="text-lg font-black text-white uppercase tracking-widest italic">Fonte de Vídeo Indisponível</span>
-                     <p className="text-xs text-gray-500 mt-4 max-w-xs uppercase font-bold leading-relaxed">
-                        Selecione uma cena real na biblioteca <br/> para iniciar sua edição cinematográfica.
-                     </p>
-                  </div>
-               )}
+            {/* Video Preview Container with flex-1 to push controls down */}
+            <div className="flex-1 flex items-center justify-center p-8 bg-[#050505] relative overflow-hidden">
+              <div 
+                ref={videoContainerRef}
+                className="relative shadow-2xl transition-all duration-500 border border-white/5 bg-[#111] overflow-hidden group"
+                style={{ 
+                  aspectRatio: videoConfig.aspectRatio.replace(':', '/'),
+                  maxHeight: '90%',
+                  maxWidth: '90%',
+                  height: videoConfig.aspectRatio === '9:16' ? '100%' : 'auto'
+                }}
+                onPointerMove={handlePointerMove}
+                onPointerUp={() => setIsDragging(null)}
+              >
+                 {activeVideoData.type === "youtube" ? (
+                    <div className="w-full h-full pointer-events-none" style={{ transform: `scale(${videoConfig.zoom / 100})` }}>
+                       <div id="youtube-player"></div>
+                    </div>
+                 ) : activeVideoData.type === "file" ? (
+                    <video 
+                      ref={videoRef}
+                      src={activeVideoData.url} 
+                      className="w-full h-full object-cover"
+                      style={{ transform: `scale(${videoConfig.zoom / 100})` }}
+                      muted={audioMode === "none" || audioMode === "music"}
+                    />
+                 ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-900/50 border-2 border-dashed border-white/5 p-10 text-center">
+                       <span className="text-5xl mb-6">🎬</span>
+                       <span className="text-lg font-black text-white uppercase tracking-widest italic">Fonte de Vídeo Indisponível</span>
+                       <p className="text-xs text-gray-500 mt-4 max-w-xs uppercase font-bold leading-relaxed">
+                          Selecione uma cena real na biblioteca <br/> para iniciar sua edição cinematográfica.
+                       </p>
+                    </div>
+                 )}
 
-               {videoConfig.safeZones && videoConfig.aspectRatio === "9:16" && (
-                 <div className="absolute inset-x-0 inset-y-0 pointer-events-none z-50 flex flex-col justify-between">
-                   <div className="h-[15%] w-full bg-red-500/20 border-b border-red-500 flex items-center justify-center">
-                     <span className="text-white font-black text-xs uppercase drop-shadow-md shadow-black">Inseguro (UI Superior)</span>
+                 {videoConfig.safeZones && videoConfig.aspectRatio === "9:16" && (
+                   <div className="absolute inset-x-0 inset-y-0 pointer-events-none z-40 flex flex-col justify-between">
+                     <div className="h-[15%] w-full bg-red-500/10 border-b border-red-500/30 flex items-center justify-center">
+                       <span className="text-red-500/50 font-black text-[8px] uppercase tracking-tighter shadow-sm shadow-black">Safe Area Top</span>
+                     </div>
+                     <div className="h-[25%] w-full bg-red-500/10 border-t border-red-500/30 flex items-center justify-center">
+                       <span className="text-red-500/50 font-black text-[8px] uppercase tracking-tighter shadow-sm shadow-black">Safe Area Bottom</span>
+                     </div>
                    </div>
-                   <div className="h-[25%] w-full bg-red-500/20 border-t border-red-500 flex items-center justify-center">
-                     <span className="text-white font-black text-xs uppercase drop-shadow-md shadow-black">Inseguro (UI Inferior)</span>
+                 )}
+
+                 {/* Subtitle Rendering - Improved Legibility and Dual Layout */}
+                 {globalSubtitle.type !== "none" && (
+                   <div 
+                     className="absolute left-1/2 -translate-x-1/2 cursor-ns-resize select-none active:scale-105 transition-all w-[90%] flex flex-col items-center z-30"
+                     onPointerDown={(e) => { e.preventDefault(); setIsDragging("subtitle"); }}
+                     style={{ top: `${globalSubtitle.y}%` }}
+                   >
+                      {(globalSubtitle.type === "pt" || globalSubtitle.type === "both") && (
+                        <div className="px-6 py-3 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 text-center font-black italic uppercase shadow-[0_10px_30px_rgba(0,0,0,0.5)] leading-tight mb-2"
+                             style={{ 
+                               color: globalSubtitle.color, 
+                               fontSize: `${globalSubtitle.size}px`, 
+                               fontFamily: `${globalSubtitle.font}, sans-serif`,
+                               textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
+                               letterSpacing: '0.02em'
+                             }}>
+                          {activeSubtitleText}
+                        </div>
+                      )}
+                      {(globalSubtitle.type === "en" || globalSubtitle.type === "both") && (
+                        <div className="px-4 py-2 rounded-lg bg-yellow-500 text-black text-center font-black italic uppercase shadow-[0_5px_15px_rgba(0,0,0,0.3)] leading-tight"
+                             style={{ 
+                               fontSize: `${globalSubtitle.size * 0.75}px`, 
+                               fontFamily: `${globalSubtitle.font}, sans-serif`,
+                               letterSpacing: '0.01em'
+                             }}>
+                          {activeSubtitleTextEn}
+                        </div>
+                      )}
                    </div>
-                 </div>
-               )}
+                 )}
 
-               {globalSubtitle.type !== "none" && (
-                 <div 
-                   className="absolute left-1/2 -translate-x-1/2 cursor-ns-resize select-none active:scale-105 transition-transform w-[90%] flex flex-col items-center gap-2"
-                   onPointerDown={(e) => { e.preventDefault(); setIsDragging("subtitle"); }}
-                   style={{ top: `${globalSubtitle.y}%` }}
-                 >
-                    {(globalSubtitle.type === "pt" || globalSubtitle.type === "both") && (
-                      <div className="px-6 py-2 rounded-lg bg-black/40 backdrop-blur-md border border-white/10 text-center font-black italic uppercase shadow-2xl"
-                           style={{ color: globalSubtitle.color, fontSize: `${globalSubtitle.size}px`, fontFamily: `"${globalSubtitle.font}", sans-serif` }}>
-                        {globalSubtitle.text}
-                      </div>
-                    )}
-                    {(globalSubtitle.type === "en" || globalSubtitle.type === "both") && (
-                      <div className="px-4 py-1.5 rounded-lg bg-yellow-500 text-black text-center font-black italic uppercase shadow-xl"
-                           style={{ fontSize: `${globalSubtitle.size * 0.75}px`, fontFamily: `"${globalSubtitle.font}", sans-serif` }}>
-                        {globalSubtitle.textEn}
-                      </div>
-                    )}
-                 </div>
-               )}
-
-               {watermark.url && (
-                 <div 
-                   className="absolute cursor-move select-none active:scale-110 transition-transform"
-                   onPointerDown={(e) => { e.preventDefault(); setIsDragging("watermark"); }}
-                   style={{ left: `${watermark.x}%`, top: `${watermark.y}%`, width: `${watermark.size}px`, transform: 'translate(-50%, -50%)', opacity: watermark.opacity/100 }}
-                 >
-                    <img src={watermark.url} className="w-full drop-shadow-2xl" />
-                 </div>
-               )}
+                 {watermark.url && (
+                   <div 
+                     className="absolute cursor-move select-none active:scale-110 transition-transform z-20"
+                     onPointerDown={(e) => { e.preventDefault(); setIsDragging("watermark"); }}
+                     style={{ left: `${watermark.x}%`, top: `${watermark.y}%`, width: `${watermark.size}px`, transform: 'translate(-50%, -50%)', opacity: watermark.opacity/100 }}
+                   >
+                      <img src={watermark.url} className="w-full drop-shadow-2xl" alt="watermark" />
+                   </div>
+                 )}
+              </div>
             </div>
 
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-full max-w-lg flex flex-col items-center gap-4 px-10">
-               <div className="flex items-center gap-8 bg-white/5 backdrop-blur-3xl px-8 py-3 rounded-full border border-white/10 shadow-2xl">
-                  <button className="text-lg opacity-40 hover:opacity-100 transition-all font-bold">⏮</button>
-                  <button onClick={togglePlay} className="w-12 h-12 bg-white text-black rounded-full flex items-center justify-center hover:scale-110 active:scale-90 transition-all shadow-xl">
-                     {isPlaying ? '⏸' : '▶'}
-                  </button>
-                  <button className="text-lg opacity-40 hover:opacity-100 transition-all font-bold">⏭</button>
-               </div>
-               <div className="w-full space-y-2">
-                  <div className="h-1.5 w-full bg-white/5 rounded-full relative cursor-pointer" onClick={(e) => {
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const x = e.clientX - rect.left;
-                    handleSeek((x / rect.width) * duration);
-                  }}>
-                     <div className="absolute top-0 left-0 h-full bg-blue-600 rounded-full" style={{ width: `${(currentTime/duration)*100}%` }}></div>
-                     <div className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg" style={{ left: `${(currentTime/duration)*100}%` }}></div>
+            {/* Dedicated Player Controls Area - No Overlap with Video Subtitles */}
+            <div className="h-28 border-t border-white/5 bg-[#0d0d0d] flex flex-col items-center justify-center gap-3 px-10 z-50">
+               <div className="w-full max-w-2xl space-y-3">
+                  {/* Progress Bar */}
+                  <div className="w-full space-y-1">
+                    <div className="h-2 w-full bg-white/5 rounded-full relative cursor-pointer group" onClick={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const x = e.clientX - rect.left;
+                      handleSeek((x / rect.width) * duration);
+                    }}>
+                       <div className="absolute top-0 left-0 h-full bg-blue-600 rounded-full shadow-[0_0_10px_rgba(37,99,235,0.5)] transition-all duration-75" style={{ width: `${(currentTime/duration)*100}%` }}></div>
+                       <div className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-xl opacity-0 group-hover:opacity-100 transition-opacity" style={{ left: `${(currentTime/duration)*100}%`, transform: 'translate(-50%, -50%)' }}></div>
+                    </div>
+                    <div className="flex justify-between text-[10px] font-black text-gray-600 uppercase tracking-[0.2em]">
+                       <span>{Math.floor(currentTime / 60)}:{(Math.floor(currentTime % 60)).toString().padStart(2, '0')}</span>
+                       <span className="text-gray-400">STUDIO PREVIEW MASTER</span>
+                       <span>{Math.floor(duration / 60)}:{(Math.floor(duration % 60)).toString().padStart(2, '0')}</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-xs font-black text-gray-500 uppercase tracking-widest">
-                     <span>{Math.floor(currentTime / 60)}:{(Math.floor(currentTime % 60)).toString().padStart(2, '0')}</span>
-                     <span className="text-gray-300">STUDIO PREVIEW MODE</span>
-                     <span>{Math.floor(duration / 60)}:{(Math.floor(duration % 60)).toString().padStart(2, '0')}s</span>
+
+                  {/* Playback Controls */}
+                  <div className="flex items-center justify-center gap-10">
+                     <button className="text-xl opacity-30 hover:opacity-100 transition-all hover:scale-110">⏮</button>
+                     <button onClick={togglePlay} className="w-14 h-14 bg-white text-black rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)]">
+                        <span className="text-2xl">{isPlaying ? '⏸' : '▶'}</span>
+                     </button>
+                     <button className="text-xl opacity-30 hover:opacity-100 transition-all hover:scale-110">⏭</button>
                   </div>
                </div>
             </div>
          </div>
 
+         {/* Sidebar Editor Panel */}
          <div className="w-[420px] border-l border-white/10 bg-[#0d0d0d] flex flex-col shadow-2xl z-40">
             <div className="grid grid-cols-5 border-b border-white/5">
                 {(["video", "legendas", "audio", "watermark", "exportar"] as EditorTab[]).map(tab => (
                   <button 
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`flex flex-col items-center justify-center py-4 text-sm font-black uppercase tracking-tighter transition-all gap-1 ${activeTab === tab ? 'text-blue-500 bg-white/5 border-b-2 border-blue-500' : 'text-gray-500 hover:text-gray-300'}`}
+                    className={`flex flex-col items-center justify-center py-4 text-[10px] font-black uppercase tracking-widest transition-all gap-1.5 ${activeTab === tab ? 'text-blue-500 bg-white/5 border-b-2 border-blue-500' : 'text-gray-500 hover:text-gray-300'}`}
                   >
-                    <span className="text-sm">{tab === 'video' ? '📺' : tab === 'legendas' ? '💬' : tab === 'audio' ? '🎵' : tab === 'watermark' ? '🏷️' : '🚀'}</span>
+                    <span className="text-lg">{tab === 'video' ? '📺' : tab === 'legendas' ? '💬' : tab === 'audio' ? '🎵' : tab === 'watermark' ? '🏷️' : '🚀'}</span>
                     {tab.slice(0, 4)}
                   </button>
                 ))}
             </div>
 
-            <div className="flex-1 p-6 space-y-8 overflow-y-auto custom-scrollbar">
+            <div className="flex-1 p-6 space-y-8 overflow-y-auto custom-scrollbar bg-[#0f0f0f]">
                {activeTab === "video" && (
                  <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
                     <div className="space-y-4">
-                       <label className="text-sm font-black text-gray-500 uppercase tracking-widest italic">Formato do Clip</label>
+                       <label className="text-xs font-black text-gray-500 uppercase tracking-widest italic">Formato da Edição</label>
                        <div className="grid grid-cols-3 gap-3">
                           {(["16:9", "9:16", "1:1"] as AspectRatio[]).map(r => (
                              <button key={r} onClick={() => setVideoConfig(v => ({...v, aspectRatio: r}))} className={`py-5 rounded-2xl border-2 flex flex-col items-center gap-2 transition-all ${videoConfig.aspectRatio === r ? 'border-blue-600 bg-blue-600/10 text-blue-500 shadow-xl' : 'border-white/5 bg-white/5 text-gray-600 hover:border-white/10'}`}>
                                  <div className={`border-2 ${r === '16:9' ? 'w-6 h-3.5' : r === '9:16' ? 'w-3.5 h-6' : 'w-5 h-5'} border-current rounded-sm`}></div>
-                                 <span className="text-sm font-black">{r}</span>
+                                 <span className="text-xs font-black uppercase tracking-tighter">{r === '9:16' ? 'TikTok' : r === '1:1' ? 'Post' : 'Cinema'}</span>
                              </button>
                           ))}
                        </div>
                     </div>
                     <div className="space-y-4">
-                       <label className="text-sm font-black text-gray-500 uppercase flex justify-between">
-                          <span>Zoom Preview</span>
+                       <label className="text-xs font-black text-gray-500 uppercase flex justify-between">
+                          <span>Zoom do Clip</span>
                           <span className="text-blue-500">{videoConfig.zoom}%</span>
                        </label>
                        <input type="range" min="100" max="250" value={videoConfig.zoom} onChange={(e) => setVideoConfig(v => ({...v, zoom: parseInt(e.target.value)}))} className="w-full bg-white/5 rounded-full accent-blue-600 h-2" />
                     </div>
-                    <div className="p-4 bg-blue-600/5 rounded-2xl border border-blue-600/10 space-y-3">
+                    <div className="p-5 bg-blue-600/5 rounded-2xl border border-blue-600/10 space-y-3">
                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-black uppercase text-gray-300">Grade de Segurança</label>
-                          <input type="checkbox" checked={videoConfig.safeZones} onChange={e => setVideoConfig(v => ({...v, safeZones: e.target.checked}))} className="w-4 h-4 rounded border-white/10 accent-blue-600" />
+                          <label className="text-xs font-black uppercase text-gray-300 tracking-wider">Safe Zones UI</label>
+                          <input type="checkbox" checked={videoConfig.safeZones} onChange={e => setVideoConfig(v => ({...v, safeZones: e.target.checked}))} className="w-5 h-5 rounded border-white/10 accent-blue-600" />
                        </div>
-                       <p className="text-sm text-gray-500 leading-relaxed font-bold">Ative para garantir que suas legendas não sejam cobertas pela interface do TikTok/Instagram.</p>
+                       <p className="text-xs text-gray-500 leading-relaxed font-bold uppercase opacity-60">Visualize as áreas de corte das interfaces sociais.</p>
                     </div>
                  </div>
                )}
@@ -605,40 +636,45 @@ function EditorContent() {
                     <Button 
                       onClick={handleGenerateAISubtitles}
                       disabled={isGeneratingSubtitles}
-                      className="w-full py-6 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all disabled:opacity-50"
+                      className="w-full py-7 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:shadow-blue-600/20 active:scale-95 transition-all disabled:opacity-50"
                     >
                       {isGeneratingSubtitles ? "ESTUDANDO VÍDEO..." : "Sugerir Legendas com IA ✨"}
                     </Button>
 
                     {subtitleSuggestions.length > 0 && (
                       <div className="space-y-3">
+                        <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Sugestões Geradas</label>
                         {subtitleSuggestions.map((s, i) => (
                           <button key={i} onClick={() => setGlobalSubtitle(prev => ({ ...prev, text: s.pt, textEn: s.en }))} className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl text-left hover:bg-blue-600/10 hover:border-blue-500/30 transition-all group">
                             <div className="text-sm font-black group-hover:text-blue-400 leading-tight">{s.pt}</div>
-                            <div className="text-sm text-gray-500 mt-1 uppercase italic tracking-tighter">{s.en}</div>
+                            <div className="text-[10px] text-gray-500 mt-1 uppercase italic tracking-tighter">{s.en}</div>
                           </button>
                         ))}
                       </div>
                     )}
                     
                     <div className="space-y-4">
-                       <label className="text-sm font-black text-gray-500 uppercase">Estilo de Texto</label>
-                       <div className="space-y-4 p-5 bg-white/5 rounded-2xl border border-white/5">
+                       <label className="text-xs font-black text-gray-500 uppercase tracking-widest">Estilização Tipográfica</label>
+                       <div className="space-y-5 p-6 bg-white/5 rounded-3xl border border-white/5">
                           <div className="space-y-2">
-                             <label className="text-sm text-gray-600 font-black uppercase">Fonte</label>
-                             <select value={globalSubtitle.font} onChange={e => setGlobalSubtitle(s => ({...s, font: e.target.value}))} className="w-full bg-black border border-white/10 rounded-xl h-10 px-3 text-sm font-bold outline-none focus:border-blue-500">
+                             <label className="text-[10px] text-gray-600 font-black uppercase tracking-widest">Família da Fonte</label>
+                             <select value={globalSubtitle.font} onChange={e => setGlobalSubtitle(s => ({...s, font: e.target.value}))} className="w-full bg-black border border-white/10 rounded-xl h-12 px-4 text-sm font-bold outline-none focus:border-blue-500 cursor-pointer">
                                 {["Inter", "Arial", "Montserrat", "Poppins", "Bebas Neue", "Roboto"].map(f => <option key={f} value={f}>{f}</option>)}
                              </select>
                           </div>
                           <div className="space-y-3">
-                             <label className="text-sm text-gray-600 font-black uppercase">Paleta Profissional</label>
-                             <div className="flex flex-wrap gap-2">
+                             <label className="text-[10px] text-gray-600 font-black uppercase tracking-widest">Escala e Cor</label>
+                             <div className="flex items-center gap-4 mb-2">
+                               <input type="range" min="16" max="64" value={globalSubtitle.size} onChange={e => setGlobalSubtitle(s => ({...s, size: parseInt(e.target.value)}))} className="flex-1 bg-black/40 rounded-full accent-blue-600 h-1.5" />
+                               <span className="text-xs font-black text-blue-500">{globalSubtitle.size}px</span>
+                             </div>
+                             <div className="flex flex-wrap gap-2 pt-2">
                                 {["#ffffff", "#fbbf24", "#ef4444", "#3b82f6", "#10b981", "#ec4899", "#f97316"].map(c => (
-                                  <button key={c} onClick={() => setGlobalSubtitle(s => ({...s, color: c}))} className={`w-7 h-7 rounded-full border-2 transition-all ${globalSubtitle.color === c ? 'border-blue-500 scale-125' : 'border-transparent'}`} style={{ backgroundColor: c }} />
+                                  <button key={c} onClick={() => setGlobalSubtitle(s => ({...s, color: c}))} className={`w-8 h-8 rounded-full border-2 transition-all duration-300 ${globalSubtitle.color === c ? 'border-blue-500 scale-110 shadow-lg shadow-blue-500/20' : 'border-white/10 hover:border-white/30'}`} style={{ backgroundColor: c }} />
                                 ))}
-                                <div className="relative w-7 h-7">
+                                <div className="relative w-8 h-8">
                                    <input type="color" value={globalSubtitle.color} onChange={e => setGlobalSubtitle(s => ({...s, color: e.target.value}))} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-                                   <div className="w-7 h-7 rounded-full border border-white/20 bg-gradient-to-br from-red-500 via-green-500 to-blue-500"></div>
+                                   <div className="w-8 h-8 rounded-full border border-white/20 bg-gradient-to-br from-red-500 via-green-500 to-blue-500 flex items-center justify-center text-[10px]">🎨</div>
                                 </div>
                              </div>
                           </div>
@@ -646,10 +682,15 @@ function EditorContent() {
                     </div>
 
                     <div className="space-y-3">
-                       <label className="text-sm font-black text-gray-500 uppercase">Exibição Dual</label>
+                       <label className="text-xs font-black text-gray-500 uppercase tracking-widest">Modo de Exibição</label>
                        <div className="grid grid-cols-2 gap-2">
-                          {["pt", "en", "both", "none"].map(type => (
-                             <button key={type} onClick={() => setGlobalSubtitle(s => ({...s, type: type as any}))} className={`py-4 rounded-xl border text-xs font-black uppercase transition-all ${globalSubtitle.type === type ? 'border-blue-500 bg-blue-500/10 text-blue-500 shadow-lg shadow-blue-500/10' : 'border-white/5 bg-white/5 text-gray-600'}`}>{type === 'both' ? 'Dual (PT+EN)' : type === 'pt' ? 'BR' : type === 'en' ? 'EN' : 'SEM'}</button>
+                          {[
+                            {id: "pt", label: "Português"},
+                            {id: "en", label: "English"},
+                            {id: "both", label: "PT + EN Master"},
+                            {id: "none", label: "Sem Legenda"}
+                          ].map(mode => (
+                             <button key={mode.id} onClick={() => setGlobalSubtitle(s => ({...s, type: mode.id as any}))} className={`py-4 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all ${globalSubtitle.type === mode.id ? 'border-blue-500 bg-blue-500/10 text-blue-500 shadow-lg shadow-blue-500/10' : 'border-white/5 bg-white/5 text-gray-600 hover:border-white/10'}`}>{mode.label}</button>
                           ))}
                        </div>
                     </div>
@@ -659,69 +700,68 @@ function EditorContent() {
                {activeTab === "audio" && (
                  <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
                     <div className="space-y-4">
-                       <label className="text-sm font-black text-gray-500 uppercase">Mixagem de Áudio</label>
-                       <div className="grid grid-cols-2 gap-2">
+                       <label className="text-xs font-black text-gray-500 uppercase tracking-widest">Arquitetura de Áudio</label>
+                       <div className="grid grid-cols-2 gap-3">
                           {[
-                            {id: "keep", label: "Som Original", icon: "🎞️"},
-                            {id: "music", label: "Trilha Somente", icon: "🎵"},
+                            {id: "keep", label: "Original", icon: "🎞️"},
+                            {id: "music", label: "Somente Trilha", icon: "🎵"},
                             {id: "mix", label: "Mix Master", icon: "🎛️"},
-                            {id: "none", label: "Mudo Local", icon: "🔇"}
+                            {id: "none", label: "Mudo Total", icon: "🔇"}
                           ].map(mode => (
-                             <button key={mode.id} onClick={() => setAudioMode(mode.id as any)} className={`p-4 rounded-2xl border-2 flex flex-col items-center gap-2 transition-all ${audioMode === mode.id ? 'border-blue-600 bg-blue-600/10 text-blue-500' : 'border-white/5 bg-white/5 text-gray-600'}`}>
-                                <span className="text-lg">{mode.icon}</span>
-                                <span className="text-sm font-black uppercase tracking-tighter">{mode.label}</span>
+                             <button key={mode.id} onClick={() => setAudioMode(mode.id as any)} className={`p-5 rounded-3xl border-2 flex flex-col items-center gap-3 transition-all ${audioMode === mode.id ? 'border-blue-600 bg-blue-600/10 text-blue-500' : 'border-white/5 bg-white/5 text-gray-600 hover:border-white/10'}`}>
+                                <span className="text-2xl">{mode.icon}</span>
+                                <span className="text-[10px] font-black uppercase tracking-widest">{mode.label}</span>
                              </button>
                           ))}
                        </div>
                     </div>
 
                     {(audioMode === "keep" || audioMode === "mix") && (
-                      <div className="space-y-3 p-5 bg-white/5 rounded-2xl border border-white/5">
-                         <div className="flex justify-between items-center text-sm font-black text-gray-500 mb-1">
-                            <span>VOLUME VÍDEO</span>
-                            <span>{volume}%</span>
+                      <div className="space-y-4 p-6 bg-white/5 rounded-3xl border border-white/5">
+                         <div className="flex justify-between items-center text-[10px] font-black text-gray-500 tracking-widest mb-1">
+                            <span>GAIN VÍDEO</span>
+                            <span className="text-blue-500">{volume}%</span>
                          </div>
-                         <input type="range" min="0" max="150" value={volume} onChange={(e) => setVolume(parseInt(e.target.value))} className="w-full bg-black/40 rounded-full accent-white h-1.5" />
-                         <Button variant="ghost" className="w-full h-8 text-sm font-black text-red-500 uppercase" onClick={() => setVolume(0)}>Mutar Original</Button>
+                         <input type="range" min="0" max="150" value={volume} onChange={(e) => setVolume(parseInt(e.target.value))} className="w-full bg-black/40 rounded-full accent-blue-600 h-1.5" />
                       </div>
                     )}
 
                     <div className="space-y-4">
-                       <div className="space-y-1">
-                          <label className="text-sm font-black text-gray-500 uppercase italic">Biblioteca de Trilhas</label>
+                       <div className="space-y-2">
+                          <label className="text-xs font-black text-gray-500 uppercase italic tracking-widest">Library Studio</label>
                           <input 
                             type="text" 
-                            placeholder="Buscar música, artista ou estilo..." 
+                            placeholder="Buscar trilha viral..." 
                             value={musicSearch}
                             onChange={e => setMusicSearch(e.target.value)}
-                            className="w-full h-12 bg-white/5 border border-white/10 rounded-xl px-4 text-xs font-bold focus:border-blue-500 outline-none"
+                            className="w-full h-14 bg-white/5 border border-white/10 rounded-2xl px-5 text-sm font-bold focus:border-blue-500 outline-none transition-all"
                           />
                        </div>
                        
-                       <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
+                       <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
                           {filteredTracks.map(m => (
-                            <div key={m.name} onClick={() => { setSelectedMusic(m); setAudioMode("mix"); showToast(`${m.name} aplicada!`, "info"); }} className={`p-4 rounded-2xl border flex items-center justify-between hover:scale-[1.02] cursor-pointer transition-all ${selectedMusic?.url === m.url ? 'border-blue-500 bg-blue-500/10' : 'bg-white/5 border-white/10'}`}>
-                               <div className="flex items-center gap-3">
-                                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs ${m.viral ? 'bg-pink-500/20 text-pink-500' : 'bg-white/10'}`}>{m.viral ? '🔥' : '🎶'}</div>
+                            <div key={m.name} onClick={() => { setSelectedMusic(m); setAudioMode("mix"); showToast(`${m.name} aplicada!`, "info"); }} className={`p-5 rounded-3xl border flex items-center justify-between hover:translate-x-1 cursor-pointer transition-all ${selectedMusic?.url === m.url ? 'border-blue-500 bg-blue-500/10' : 'bg-white/5 border-white/10 hover:border-white/30'}`}>
+                               <div className="flex items-center gap-4">
+                                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg ${m.viral ? 'bg-pink-500/20 text-pink-500' : 'bg-white/10 text-gray-400'}`}>{m.viral ? '🔥' : '🎶'}</div>
                                   <div>
                                      <div className="text-sm font-black leading-none">{m.name}</div>
-                                     <div className="text-sm text-gray-600 mt-1 uppercase font-bold">{m.artist} • {m.style}</div>
+                                     <div className="text-[10px] text-gray-500 mt-2 uppercase font-black tracking-widest">{m.artist} • {m.style}</div>
                                   </div>
                                </div>
-                               {selectedMusic?.url === m.url ? <span className="text-sm font-black text-blue-500 uppercase">ATIVA</span> : <span className="text-sm font-black text-gray-700 uppercase">USAR</span>}
+                               {selectedMusic?.url === m.url && <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse shadow-lg shadow-blue-500/50"></div>}
                             </div>
                           ))}
                        </div>
                     </div>
 
                     {selectedMusic && (
-                      <div className="space-y-3 p-5 bg-blue-600/5 rounded-2xl border border-blue-600/20">
-                         <div className="flex justify-between items-center text-sm font-black text-blue-300 mb-1">
-                            <span>VOLUME TRILHA</span>
+                      <div className="space-y-4 p-6 bg-blue-600/5 rounded-3xl border border-blue-600/20 animate-in slide-in-from-bottom-2">
+                         <div className="flex justify-between items-center text-[10px] font-black text-blue-400 tracking-widest mb-1">
+                            <span>GAIN TRILHA</span>
                             <span>{musicVolume}%</span>
                          </div>
                          <input type="range" min="0" max="100" value={musicVolume} onChange={(e) => setMusicVolume(parseInt(e.target.value))} className="w-full bg-black/40 rounded-full accent-blue-500 h-1.5" />
-                         <Button variant="ghost" className="w-full h-8 text-sm font-black text-gray-500 uppercase" onClick={() => { setSelectedMusic(null); setAudioMode("keep"); }}>Remover Trilha</Button>
+                         <Button variant="ghost" className="w-full h-10 text-[10px] font-black text-red-500/70 uppercase tracking-widest hover:text-red-500 transition-colors" onClick={() => { setSelectedMusic(null); setAudioMode("keep"); }}>Remover Trilha Ativa</Button>
                       </div>
                     )}
                  </div>
@@ -730,40 +770,40 @@ function EditorContent() {
                {activeTab === "watermark" && (
                  <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
                     <div className="space-y-4">
-                       <label className="text-sm font-black text-gray-500 uppercase">Marca d'Água / Logo</label>
+                       <label className="text-xs font-black text-gray-500 uppercase tracking-widest">Branding Visual</label>
                        <div className="grid grid-cols-1 gap-4">
-                          <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-white/10 hover:border-blue-500/50 bg-white/5 rounded-3xl cursor-pointer transition-all group overflow-hidden">
+                          <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-white/10 hover:border-blue-500/50 bg-white/5 rounded-3xl cursor-pointer transition-all group overflow-hidden shadow-inner">
                              {watermark.url ? (
-                                <div className="relative w-full h-full p-4 flex items-center justify-center">
-                                   <img src={watermark.url} className="max-w-full max-h-full object-contain drop-shadow-xl" />
-                                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                                      <span className="text-sm font-black uppercase">Trocar Imagem</span>
+                                <div className="relative w-full h-full p-6 flex items-center justify-center">
+                                   <img src={watermark.url} className="max-w-full max-h-full object-contain drop-shadow-2xl" alt="watermark preview" />
+                                   <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
+                                      <span className="text-xs font-black uppercase tracking-[0.2em] bg-white text-black px-4 py-2 rounded-full">Trocar Imagem</span>
                                    </div>
                                 </div>
                              ) : (
                                 <>
-                                   <span className="text-2xl mb-2">📁</span>
-                                   <span className="text-xs font-black text-gray-500 uppercase tracking-widest">Clique para subir Logo</span>
+                                   <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-4 group-hover:bg-blue-600/20 transition-all">📂</div>
+                                   <span className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Upload Transparent PNG</span>
                                 </>
                              )}
                              <input type="file" className="hidden" accept="image/*" onChange={handleWatermarkUpload} />
                           </label>
-                          {watermark.url && <Button variant="ghost" className="h-8 text-sm font-black text-red-500 uppercase" onClick={() => setWatermark(w => ({...w, url: ""}))}>Remover Marca</Button>}
+                          {watermark.url && <Button variant="ghost" className="h-10 text-[10px] font-black text-red-500/70 uppercase tracking-widest hover:text-red-500" onClick={() => setWatermark(w => ({...w, url: ""}))}>Remover Marca d'Água</Button>}
                        </div>
                     </div>
 
                     {watermark.url && (
-                       <div className="space-y-6 p-6 bg-white/5 rounded-3xl border border-white/5">
+                       <div className="space-y-6 p-7 bg-[#111] rounded-[2rem] border border-white/5 shadow-xl">
                           <div className="space-y-4">
-                             <label className="text-xs font-black text-gray-500 uppercase flex justify-between">Escala <span>{watermark.size}px</span></label>
-                             <input type="range" min="30" max="250" value={watermark.size} onChange={e => setWatermark(w => ({...w, size: parseInt(e.target.value)}))} className="w-full bg-black/40 rounded-full accent-white h-1.5" />
+                             <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex justify-between">Tamanho do Logo <span>{watermark.size}px</span></label>
+                             <input type="range" min="30" max="250" value={watermark.size} onChange={e => setWatermark(w => ({...w, size: parseInt(e.target.value)}))} className="w-full bg-black/60 rounded-full accent-white h-1.5" />
                           </div>
                           <div className="space-y-4">
-                             <label className="text-xs font-black text-gray-500 uppercase flex justify-between">Opacidade <span>{watermark.opacity}%</span></label>
-                             <input type="range" min="10" max="100" value={watermark.opacity} onChange={e => setWatermark(w => ({...w, opacity: parseInt(e.target.value)}))} className="w-full bg-black/40 rounded-full accent-white h-1.5" />
+                             <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex justify-between">Transparência <span>{watermark.opacity}%</span></label>
+                             <input type="range" min="10" max="100" value={watermark.opacity} onChange={e => setWatermark(w => ({...w, opacity: parseInt(e.target.value)}))} className="w-full bg-black/60 rounded-full accent-white h-1.5" />
                           </div>
-                          <div className="pt-4 border-t border-white/5">
-                             <p className="text-sm text-gray-500 font-bold uppercase text-center italic">Arraste a logo no preview para posicionar</p>
+                          <div className="pt-6 border-t border-white/5">
+                             <p className="text-[10px] text-gray-600 font-black uppercase text-center tracking-widest leading-relaxed">Arraste no preview para ancorar</p>
                           </div>
                        </div>
                     )}
@@ -771,15 +811,17 @@ function EditorContent() {
                )}
 
                {activeTab === "exportar" && (
-                 <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500 text-center py-10">
-                    <div className="w-20 h-20 bg-blue-600/10 rounded-full flex items-center justify-center mx-auto mb-6 text-3xl">🚀</div>
-                    <div className="space-y-2">
-                       <h3 className="text-xl font-black uppercase italic tracking-tighter">Pronto para o Viral?</h3>
-                       <p className="text-sm text-gray-500 font-bold uppercase max-w-[200px] mx-auto leading-relaxed">Sua edição será processada em 4K nos nossos servidores de alta performance.</p>
+                 <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500 text-center py-12">
+                    <div className="w-24 h-24 bg-blue-600/10 rounded-full flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-blue-600/10">
+                       <span className="text-4xl animate-pulse">🚀</span>
                     </div>
-                    <Button onClick={handleGenerateVideo} className="w-full h-16 rounded-[2rem] bg-blue-600 font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-blue-600/40 hover:scale-[1.02] transition-all">RENDERIZAR VÍDEO 🎬</Button>
-                    <div className="pt-10 flex flex-col gap-3">
-                       <Button variant="outline" className="w-full h-12 border-white/10 text-sm font-black text-gray-500 uppercase" onClick={handleSaveProject}>Apenas Salvar Rascunho</Button>
+                    <div className="space-y-3">
+                       <h3 className="text-2xl font-black uppercase italic tracking-tighter">Prepare seu Viral</h3>
+                       <p className="text-xs text-gray-500 font-bold uppercase max-w-[260px] mx-auto leading-relaxed tracking-widest opacity-60">Renderizando em Alta Definição <br/> nos nossos servidores Pro.</p>
+                    </div>
+                    <Button onClick={handleGenerateVideo} className="w-full h-20 rounded-[2.5rem] bg-blue-600 font-black text-xs uppercase tracking-[0.3em] shadow-2xl shadow-blue-600/50 hover:scale-[1.02] hover:bg-blue-500 active:scale-95 transition-all">RENDERIZAR VÍDEO 🎬</Button>
+                    <div className="pt-8 flex flex-col gap-4">
+                       <button className="text-xs font-black text-gray-600 uppercase tracking-widest hover:text-white transition-colors" onClick={handleSaveProject}>Salvar apenas rascunho</button>
                     </div>
                  </div>
                )}
@@ -787,75 +829,87 @@ function EditorContent() {
          </div>
       </div>
 
-      <div className="h-[200px] border-t border-white/5 bg-[#0a0a0a] flex flex-col relative">
-         <div className="h-8 flex items-center border-b border-white/5 px-6 bg-[#111]">
-            <div className="flex-1 flex gap-6 text-xs font-black text-gray-500 uppercase overflow-x-auto no-scrollbar">
-               <button className="hover:text-white flex items-center gap-1 transition-colors">✂️ Cortar</button>
-               <button className="hover:text-white flex items-center gap-1 transition-colors">🗑 Deletar</button>
-               <button className="hover:text-white flex items-center gap-1 transition-colors">↩️ Desfazer</button>
-               <button className="hover:text-white flex items-center gap-1 transition-colors">📋 Duplicar</button>
+      {/* Footer Timeline Area */}
+      <div className="h-[210px] border-t border-white/5 bg-[#0a0a0a] flex flex-col relative z-50">
+         <div className="h-10 flex items-center border-b border-white/5 px-6 bg-[#0d0d0d] shadow-inner">
+            <div className="flex-1 flex gap-8 text-[10px] font-black text-gray-500 uppercase tracking-widest overflow-x-auto no-scrollbar">
+               <button className="hover:text-white flex items-center gap-2 transition-colors">✂️ Cortar</button>
+               <button className="hover:text-white flex items-center gap-2 transition-colors">🗑 Deletar</button>
+               <button className="hover:text-white flex items-center gap-2 transition-colors">↩️ Desfazer</button>
+               <button className="hover:text-white flex items-center gap-2 transition-colors">📋 Duplicar</button>
             </div>
-            <div className="flex items-center gap-3">
-               <span className="text-sm font-black text-gray-600">ZOOM</span>
-               <input type="range" min="5" max="40" value={zoomLevel} onChange={(e) => setZoomLevel(parseInt(e.target.value))} className="w-24 h-1 bg-white/5 rounded-full accent-white" />
+            <div className="flex items-center gap-4">
+               <span className="text-[10px] font-black text-gray-600 tracking-widest">MAGI-ZOOM</span>
+               <input type="range" min="5" max="40" value={zoomLevel} onChange={(e) => setZoomLevel(parseInt(e.target.value))} className="w-28 h-1 bg-white/5 rounded-full accent-white" />
             </div>
          </div>
 
          <div 
            ref={timelineRef}
-           className="flex-1 overflow-x-auto overflow-y-hidden custom-scrollbar relative px-6 py-4"
+           className="flex-1 overflow-x-auto overflow-y-hidden custom-scrollbar relative px-6 py-6 bg-[#080808]"
            onMouseDown={handleTimelineClick}
          >
-            <div className="h-4 flex items-end mb-4 sticky top-0 z-10">
-               {Array.from({ length: Math.ceil(duration) + 1 }).map((_, i) => (
-                 <div key={i} className="flex-shrink-0 flex flex-col items-center justify-end h-full" style={{ width: `${zoomLevel}px` }}>
-                    {i % 5 === 0 ? <span className="text-[6px] font-bold text-gray-600 leading-none">{i}s</span> : <div className="w-[1px] h-1 bg-white/10"></div>}
-                 </div>
-               ))}
+            <div className="h-6 flex items-end mb-4 sticky top-0 z-10 border-b border-white/5">
+                {Array.from({ length: Math.ceil(duration) + 1 }).map((_, i) => (
+                  <div key={i} className="flex-shrink-0 flex flex-col items-center justify-end h-full relative" style={{ width: `${zoomLevel}px` }}>
+                     {i % 5 === 0 ? <span className="text-[8px] font-black text-gray-600 leading-none absolute -top-1">{i}s</span> : <div className="w-[1px] h-1.5 bg-white/10"></div>}
+                  </div>
+                ))}
             </div>
 
-            <div className="space-y-[2px] relative w-fit">
-               <div className="flex items-center gap-4">
-                  <div className="w-8 h-10 flex items-center justify-center text-[7px] font-black text-gray-700 bg-white/5 rounded-md">V1</div>
-                  <div className="h-10 bg-blue-600/20 border border-blue-600/30 rounded-xl relative overflow-hidden flex items-center" style={{ width: `${duration * zoomLevel}px` }}>
+            <div className="space-y-[4px] relative w-fit">
+               {/* Video Track */}
+               <div className="flex items-center gap-6">
+                  <div className="w-10 h-12 flex items-center justify-center text-[8px] font-black text-gray-700 bg-white/5 rounded-xl border border-white/5 shadow-md">V1</div>
+                  <div className="h-12 bg-blue-600/10 border border-blue-600/20 rounded-2xl relative overflow-hidden flex items-center" style={{ width: `${duration * zoomLevel}px` }}>
                      {timeline.filter(e => e.type === "video").map(ev => (
-                        <div key={ev.id} className="h-8 bg-blue-600 rounded-lg border border-white/20 flex items-center px-3 text-sm font-black shadow-lg mx-1" style={{ width: `${ev.duration * zoomLevel - 8}px` }}>
+                        <div key={ev.id} className="h-10 bg-blue-600 rounded-[0.5rem] border border-white/20 flex items-center px-4 text-xs font-black shadow-lg mx-1 transition-all" style={{ width: `${ev.duration * zoomLevel - 8}px` }}>
                            {ev.id.toUpperCase()}
                         </div>
                      ))}
                   </div>
                </div>
 
-               <div className="flex items-center gap-4">
-                  <div className="w-8 h-8 flex items-center justify-center text-[7px] font-black text-gray-700 bg-white/5 rounded-md">A1</div>
-                  <div className="h-8 bg-indigo-600/10 border border-indigo-600/20 rounded-lg relative overflow-hidden flex items-center" style={{ width: `${duration * zoomLevel}px` }}>
-                     {selectedMusic && <div className="h-6 bg-indigo-600 rounded-md border border-white/10 flex items-center px-3 text-[7px] font-bold shadow-lg" style={{ width: `${duration * zoomLevel}px` }}>{selectedMusic.name.toUpperCase()}</div>}
+               {/* Audio Track */}
+               <div className="flex items-center gap-6">
+                  <div className="w-10 h-10 flex items-center justify-center text-[8px] font-black text-gray-700 bg-white/5 rounded-xl border border-white/5 shadow-md">A1</div>
+                  <div className="h-10 bg-indigo-600/10 border border-indigo-600/20 rounded-xl relative overflow-hidden flex items-center" style={{ width: `${duration * zoomLevel}px` }}>
+                     {selectedMusic && <div className="h-8 bg-indigo-600 rounded-[0.5rem] border border-white/10 flex items-center px-4 text-[9px] font-black shadow-lg" style={{ width: `${duration * zoomLevel}px` }}>{selectedMusic.name.toUpperCase()}</div>}
                   </div>
                </div>
 
-               <div className="flex items-center gap-4">
-                  <div className="w-8 h-6 flex items-center justify-center text-[7px] font-black text-gray-700 bg-white/5 rounded-md">S1</div>
-                  <div className="h-6 bg-amber-600/10 border border-amber-600/20 rounded-md relative overflow-hidden flex items-center" style={{ width: `${duration * zoomLevel}px` }}>
-                     {globalSubtitle.type !== "none" && <div className="h-4 bg-amber-600 rounded-sm border border-white/10 flex items-center px-2 text-[6px] font-black opacity-60" style={{ width: `${duration * zoomLevel}px` }}>{globalSubtitle.text}</div>}
+               {/* Subtitle Track */}
+               <div className="flex items-center gap-6">
+                  <div className="w-10 h-8 flex items-center justify-center text-[8px] font-black text-gray-700 bg-white/5 rounded-xl border border-white/5 shadow-md">S1</div>
+                  <div className="h-8 bg-amber-600/10 border border-amber-600/20 rounded-xl relative overflow-hidden flex items-center" style={{ width: `${duration * zoomLevel}px` }}>
+                     {globalSubtitle.type !== "none" && <div className="h-6 bg-amber-600 rounded-[0.3rem] border border-white/10 flex items-center px-3 text-[8px] font-black opacity-60 shadow-md" style={{ width: `${duration * zoomLevel}px` }}>{activeSubtitleText.slice(0, 30)}...</div>}
                   </div>
                </div>
             </div>
 
+            {/* Playhead */}
             <div 
-              className="absolute top-0 bottom-0 w-[2px] bg-red-600 z-[20] pointer-events-none transition-all duration-75"
-              style={{ left: `${(currentTime * zoomLevel) + 24}px` }}
+              className="absolute top-0 bottom-0 w-[2px] bg-red-600 z-[20] pointer-events-none transition-all duration-75 shadow-[0_0_10px_rgba(220,38,38,0.5)]"
+              style={{ left: `${(currentTime * zoomLevel) + 32}px` }}
             >
-               <div className="w-3 h-3 bg-red-600 rounded-full absolute -top-1 -left-[5.5px] shadow-lg"></div>
+               <div className="w-4 h-4 bg-red-600 rounded-full absolute -top-1.5 -left-[7px] shadow-2xl border-2 border-white/20"></div>
             </div>
          </div>
       </div>
       
       <style jsx global>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 3px; height: 3px; }
+        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700;900&family=Montserrat:wght@400;700;900&family=Poppins:wght@400;700;900&family=Roboto:wght@400;700;900&display=swap');
+
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #222; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #222; border-radius: 10px; border: 1px solid #111; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #333; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
+
+        /* Ensure font application */
+        * {
+          font-family: 'Inter', sans-serif;
+        }
       `}</style>
     </div>
   );
@@ -864,12 +918,15 @@ function EditorContent() {
 export default function EditorPage() {
   return (
     <Suspense fallback={
-      <div className="h-screen bg-[#0a0a0a] flex flex-col items-center justify-center gap-6">
+      <div className="h-screen bg-[#0a0a0a] flex flex-col items-center justify-center gap-8">
         <div className="relative">
-           <div className="w-16 h-16 border-4 border-blue-600/20 border-t-blue-600 animate-spin rounded-full"></div>
-           <div className="absolute inset-0 flex items-center justify-center text-xs">🚀</div>
+           <div className="w-20 h-20 border-4 border-blue-600/10 border-t-blue-600 animate-spin rounded-full shadow-2xl"></div>
+           <div className="absolute inset-0 flex items-center justify-center text-xl">🚀</div>
         </div>
-        <p className="text-sm font-black text-gray-500 uppercase tracking-[0.3em] animate-pulse">Iniciando Studio Pro v2...</p>
+        <div className="flex flex-col items-center gap-2">
+           <p className="text-sm font-black text-white uppercase tracking-[0.4em] animate-pulse">LKMOVIE STUDIO PRO</p>
+           <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest opacity-60 italic">Iniciando motor de renderização v2...</p>
+        </div>
       </div>
     }>
       <EditorContent />
