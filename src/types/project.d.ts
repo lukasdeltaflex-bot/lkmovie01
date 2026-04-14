@@ -2,6 +2,13 @@ import { Timestamp } from "firebase/firestore";
 
 export type ProjectStatus = "active" | "deleted";
 
+export interface TranscriptSegment {
+  start: number;
+  end: number;
+  text: string;
+  language: "pt-BR" | "en";
+}
+
 export interface TimelineEvent {
   id: string;
   type: "video" | "audio" | "subtitle" | "overlay";
@@ -50,6 +57,10 @@ export interface SavedProject {
   volumeMusic: number;
   musicUrl?: string;
   musicCategory?: string;
+  
+  // Transcript / Subtitles V2
+  transcriptSegments?: TranscriptSegment[];
+  transcriptMode?: "pt" | "en" | "both" | "none";
   
   // Metadata
   createdAt: Timestamp | any;

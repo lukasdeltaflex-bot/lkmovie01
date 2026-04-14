@@ -37,10 +37,15 @@ interface TimelineContextType {
   addTimelineEvent: (event: Omit<TimelineEvent, "id">) => void;
   removeTimelineEvent: (id: string) => void;
   clearTimeline: () => void;
+  // Transcript support
+  transcriptSegments: TranscriptSegment[];
+  setTranscriptSegments: (segments: TranscriptSegment[]) => void;
   // Legacy support
   selectedVideo: YouTubeVideo | null;
   setSelectedVideo: (video: YouTubeVideo | null) => void;
 }
+
+import { TranscriptSegment } from "@/types/project";
 
 const TimelineContext = createContext<TimelineContextType | undefined>(undefined);
 
@@ -48,6 +53,8 @@ export function SelectedVideoProvider({ children }: { children: ReactNode }) {
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [clips, setClips] = useState<VideoClip[]>([]);
   const [activeClipIndex, setActiveClipIndex] = useState(0);
+
+  const [transcriptSegments, setTranscriptSegments] = useState<TranscriptSegment[]>([]);
 
   const addClip = (video: YouTubeVideo) => {
     const id = `v-${Date.now()}`;
@@ -81,6 +88,7 @@ export function SelectedVideoProvider({ children }: { children: ReactNode }) {
   const clearTimeline = () => {
     setClips([]);
     setTimeline([]);
+    setTranscriptSegments([]);
     setActiveClipIndex(0);
   };
 
@@ -109,6 +117,8 @@ export function SelectedVideoProvider({ children }: { children: ReactNode }) {
       addTimelineEvent,
       removeTimelineEvent,
       clearTimeline,
+      transcriptSegments,
+      setTranscriptSegments,
       selectedVideo,
       setSelectedVideo
     }}>

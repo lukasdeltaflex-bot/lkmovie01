@@ -99,7 +99,9 @@ function EditorContent() {
     addTimelineEvent, 
     removeTimelineEvent,
     setClips,
-    setTimeline
+    setTimeline,
+    transcriptSegments,
+    setTranscriptSegments
   } = useSelectedVideo();
   
   const { user } = useAuth();
@@ -154,6 +156,8 @@ function EditorContent() {
     useAnimation: true,
     animationType: "pop" as "pop" | "slide" | "glitch" | "fade",
   });
+
+  const [transcriptMode, setTranscriptMode] = useState<"pt" | "en" | "both" | "none">("both");
 
   const [watermark, setWatermark] = useState({
     url: branding.defaultWatermark || "",
@@ -218,11 +222,13 @@ function EditorContent() {
           if (p.musicUrl) setSelectedMusic({ name: "Música Carregada", url: p.musicUrl });
           setMusicVolume((p.volumeMusic || 0.5) * 100);
           setVolume((p.volumeVideo || 1) * 100);
+           if (p.transcriptSegments) setTranscriptSegments(p.transcriptSegments);
+           if (p.transcriptMode) setTranscriptMode(p.transcriptMode);
         }
       }
     };
     load();
-  }, [projectId, setClips, setTimeline]);
+  }, [projectId, setClips, setTimeline, setTranscriptSegments]);
 
   // Detecção refinada da fonte do vídeo
   const activeVideoData = useMemo(() => {
@@ -447,6 +453,8 @@ function EditorContent() {
         endScreenUrl: branding.defaultEndScreen || "",
         audioMode: audioMode,
         volumeVideo: volume / 100,
+        transcriptSegments: transcriptSegments,
+        transcriptMode: transcriptMode,
       };
 
       let currentId = projectId;
@@ -463,22 +471,25 @@ function EditorContent() {
     } finally { setIsSaving(false); }
   };
 
-  const handleGenerateAISubtitles = async () => {
-    if (!clips[0]) return;
-    setIsGeneratingSubtitles(true);
-    try {
-      const response = await axios.post("/api/ai/suggest-subtitles", {
-        videoTitle: clips[0].title,
-        context: "Vídeo viral para redes sociais"
-      });
-      setSubtitleSuggestions(response.data.suggestions);
-      showToast("Legendas sugeradas! ✨", "success");
-    } catch (e) {
-      showToast("Erro ao conectar com a IA.", "error");
-    } finally {
-      setIsGeneratingSubtitles(false);
-    }
-  };
+   const handleGenerateAISubtitles = async () => {
+     if (!clips[0]) return;
+     setIsGeneratingSubtitles(true);
+     try {
+       const response = await axios.post("/api/ai/transcribe-video", {
+         videoTitle: clips[0].title,
+         duration: duration
+       });
+       if (response.data.segments) {
+         setTranscriptSegments(response.data.segments);
+         setTranscriptMode("both");
+         showToast("Transcrição temporal concluída! 🎙️", "success");
+       }
+     } catch (e) {
+       showToast("Erro ao processar transcrição.", "error");
+     } finally {
+       setIsGeneratingSubtitles(false);
+     }
+   };
 
   const handleGenerateVideo = async () => {
     const id = await handleSaveProject();
@@ -537,11 +548,31 @@ function EditorContent() {
     return text.split(' ');
   }, [activeSubtitleText, globalSubtitle.preset]);
 
-  const activeWordIndex = useMemo(() => {
-    if (!currentSubtitleObj || subtitleWords.length === 0) return -1;
-    const progress = (currentTime - currentSubtitleObj.startTime) / currentSubtitleObj.duration;
-    return Math.floor(progress * subtitleWords.length);
-  }, [currentTime, currentSubtitleObj, subtitleWords]);
+   const activeWordIndex = useMemo(() => {
+     if (!currentSubtitleObj || subtitleWords.length === 0) return -1;
+     const progress = (currentTime - currentSubtitleObj.startTime) / currentSubtitleObj.duration;
+     return Math.floor(progress * subtitleWords.length);
+   }, [currentTime, currentSubtitleObj, subtitleWords]);
+
+   // Logica de Transcrição Temporal V2
+   const activeTranscriptPT = useMemo(() => {
+     return transcriptSegments.find(s => s.language === "pt-BR" && currentTime >= s.start && currentTime <= s.end)?.text || "";
+   }, [transcriptSegments, currentTime]);
+
+   const activeTranscriptEN = useMemo(() => {
+     return transcriptSegments.find(s => s.language === "en" && currentTime >= s.start && currentTime <= s.end)?.text || "";
+   }, [transcriptSegments, currentTime]);
+
+   const finalSubtitlePT = activeTranscriptPT || activeSubtitleText;
+   const finalSubtitleEN = activeTranscriptEN || activeSubtitleTextEn;
+
+   const finalSubtitleWords = useMemo(() => {
+     if (!finalSubtitlePT) return [];
+     const text = globalSubtitle.preset === 'tiktok' || (SUBTITLE_PRESETS[globalSubtitle.preset as keyof typeof SUBTITLE_PRESETS]?.case === 'uppercase')
+       ? finalSubtitlePT.toUpperCase() 
+       : finalSubtitlePT;
+     return text.split(' ');
+   }, [finalSubtitlePT, globalSubtitle.preset]);
 
   const currentPreset = SUBTITLE_PRESETS[globalSubtitle.preset as keyof typeof SUBTITLE_PRESETS] || SUBTITLE_PRESETS.tiktok;
 
@@ -635,7 +666,7 @@ function EditorContent() {
                  )}
 
                  {/* Subtitle Rendering */}
-                 {globalSubtitle.type !== "none" && (
+                 {transcriptMode !== "none" && (
                     <div 
                       key={`${activeSubtitleText}-${globalSubtitle.animationType}`} 
                       className={`absolute left-1/2 -translate-x-1/2 cursor-ns-resize select-none active:scale-105 transition-all w-[95%] flex flex-col items-center z-[60] ${globalSubtitle.useAnimation ? `animate-${globalSubtitle.animationType}` : ''}`}
@@ -643,58 +674,58 @@ function EditorContent() {
                       style={{ top: `${globalSubtitle.y}%` }}
                     >
                       <div className="flex flex-col items-center gap-4">
-                        {(globalSubtitle.type === "pt" || globalSubtitle.type === "both") && activeSubtitleText && (
-                          <div 
-                            className={`px-8 py-4 rounded-2xl text-center flex flex-wrap justify-center gap-[0.2em] leading-[1.1] transform perspective-1000`}
-                            style={{ 
-                              backgroundColor: globalSubtitle.showBg ? currentPreset.bg : 'transparent',
-                              backdropFilter: globalSubtitle.showBg && currentPreset.bg !== 'transparent' ? 'blur(10px)' : 'none',
-                              color: globalSubtitle.color, 
-                              fontSize: `${globalSubtitle.size}px`, 
-                              fontFamily: `'${currentPreset.font}', sans-serif`,
-                              fontWeight: currentPreset.weight,
-                              fontStyle: 'italic',
-                              textShadow: currentPreset.shadow,
-                              WebkitTextStroke: currentPreset.stroke,
-                              letterSpacing: '-0.02em',
-                            }}
-                          >
-                            {subtitleWords.map((word, idx) => (
-                              <span 
-                                key={idx} 
-                                className="inline-block transition-all duration-200 relative"
-                                style={{
-                                  transform: idx === activeWordIndex ? 'scale(1.18) translateY(-2px) rotate(-1deg)' : 'scale(1)',
-                                  filter: idx === activeWordIndex ? `drop-shadow(0 0 12px ${currentPreset.highlight})` : 'none',
-                                  backgroundColor: (globalSubtitle.preset === 'captionBox' && idx === activeWordIndex) ? '#ffffff' : 'transparent',
-                                  color: (globalSubtitle.preset === 'captionBox' && idx === activeWordIndex) ? '#000000' : (idx === activeWordIndex ? currentPreset.highlight : 'inherit'),
-                                  padding: globalSubtitle.preset === 'captionBox' ? '0 0.2em' : '0',
-                                  borderRadius: '0.2em',
-                                }}
-                              >
-                                {word}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        {(globalSubtitle.type === "en" || globalSubtitle.type === "both") && activeSubtitleTextEn && (
-                          <div 
-                            className="px-6 py-2.5 rounded-xl text-center font-black italic uppercase leading-none shadow-2xl transition-all border border-white/10"
-                            style={{ 
-                              backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                              backdropFilter: 'blur(8px)',
-                              color: '#fbbf24',
-                              fontSize: `${globalSubtitle.size * 0.55}px`, 
-                              fontFamily: `'Montserrat', sans-serif`,
-                              textShadow: '0 2px 4px rgba(0,0,0,0.8)',
-                              marginTop: '-0.3em',
-                              letterSpacing: '0.05em',
-                              opacity: 0.9
-                            }}
-                          >
-                            {activeSubtitleTextEn}
-                          </div>
-                        )}
+                         {(transcriptMode === "pt" || transcriptMode === "both") && finalSubtitlePT && (
+                           <div 
+                             className={`px-8 py-4 rounded-2xl text-center flex flex-wrap justify-center gap-[0.2em] leading-[1.1] transform perspective-1000`}
+                             style={{ 
+                               backgroundColor: globalSubtitle.showBg ? currentPreset.bg : 'transparent',
+                               backdropFilter: globalSubtitle.showBg && currentPreset.bg !== 'transparent' ? 'blur(10px)' : 'none',
+                               color: globalSubtitle.color, 
+                               fontSize: `${globalSubtitle.size}px`, 
+                               fontFamily: `'${currentPreset.font}', sans-serif`,
+                               fontWeight: currentPreset.weight,
+                               fontStyle: 'italic',
+                               textShadow: currentPreset.shadow,
+                               WebkitTextStroke: currentPreset.stroke,
+                               letterSpacing: '-0.02em',
+                             }}
+                           >
+                             {finalSubtitleWords.map((word, idx) => (
+                               <span 
+                                 key={idx} 
+                                 className="inline-block transition-all duration-200 relative text-shadow-lg"
+                                 style={{
+                                   transform: (transcriptSegments.length > 0) ? 'scale(1)' : (idx === activeWordIndex ? 'scale(1.18) translateY(-2px) rotate(-1deg)' : 'scale(1)'),
+                                   filter: (transcriptSegments.length > 0) ? 'none' : (idx === activeWordIndex ? `drop-shadow(0 0 12px ${currentPreset.highlight})` : 'none'),
+                                   backgroundColor: (globalSubtitle.preset === 'captionBox' && idx === activeWordIndex && transcriptSegments.length === 0) ? '#ffffff' : 'transparent',
+                                   color: (globalSubtitle.preset === 'captionBox' && idx === activeWordIndex && transcriptSegments.length === 0) ? '#000000' : (idx === activeWordIndex && transcriptSegments.length === 0 ? currentPreset.highlight : 'inherit'),
+                                   padding: globalSubtitle.preset === 'captionBox' ? '0 0.2em' : '0',
+                                   borderRadius: '0.2em',
+                                 }}
+                               >
+                                 {word}
+                               </span>
+                             ))}
+                           </div>
+                         )}
+                         {(transcriptMode === "en" || transcriptMode === "both") && finalSubtitleEN && (
+                           <div 
+                             className="px-6 py-2.5 rounded-xl text-center font-black italic uppercase leading-none shadow-2xl transition-all border border-white/10"
+                             style={{ 
+                               backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                               backdropFilter: 'blur(8px)',
+                               color: '#fbbf24',
+                               fontSize: `${globalSubtitle.size * 0.55}px`, 
+                               fontFamily: `'Montserrat', sans-serif`,
+                               textShadow: '0 2px 4px rgba(0,0,0,0.8)',
+                               marginTop: '-0.3em',
+                               letterSpacing: '0.05em',
+                               opacity: 0.9
+                             }}
+                           >
+                             {finalSubtitleEN}
+                           </div>
+                         )}
                       </div>
                    </div>
                  )}
@@ -871,19 +902,19 @@ function EditorContent() {
                        </div>
                     </div>
 
-                    <div className="space-y-4">
-                       <label className="text-[10px] font-display font-black text-gray-500 uppercase tracking-widest italic">Modo de Exibição / Dual Language</label>
-                       <div className="grid grid-cols-2 gap-2">
-                          {[
-                            {id: "pt", label: "PT-BR Principal"},
-                            {id: "en", label: "English Only"},
-                            {id: "both", label: "Dual PT + EN"},
-                            {id: "none", label: "Ocultar Texto"}
-                          ].map(mode => (
-                             <button key={mode.id} onClick={() => setGlobalSubtitle(s => ({...s, type: mode.id as any}))} className={`py-4 rounded-xl border text-[9px] font-bold uppercase tracking-wider transition-all font-display ${globalSubtitle.type === mode.id ? 'border-blue-600 bg-blue-600/10 text-white shadow-xl' : 'border-white/5 bg-[#1a1a1a] text-gray-600 hover:text-white'}`}>{mode.label}</button>
-                          ))}
-                       </div>
-                    </div>
+                     <div className="space-y-4">
+                        <label className="text-[10px] font-display font-black text-gray-500 uppercase tracking-widest italic">Modo de Exibição / Dual Language</label>
+                        <div className="grid grid-cols-2 gap-2">
+                           {[
+                             {id: "pt", label: "PT-BR Principal"},
+                             {id: "en", label: "English Only"},
+                             {id: "both", label: "Dual PT + EN"},
+                             {id: "none", label: "Ocultar Texto"}
+                           ].map(mode => (
+                              <button key={mode.id} onClick={() => setTranscriptMode(mode.id as any)} className={`py-4 rounded-xl border text-[9px] font-bold uppercase tracking-wider transition-all font-display ${transcriptMode === mode.id ? 'border-blue-600 bg-blue-600/10 text-white shadow-xl' : 'border-white/5 bg-[#1a1a1a] text-gray-600 hover:text-white'}`}>{mode.label}</button>
+                           ))}
+                        </div>
+                     </div>
                  </div>
                )}
 
