@@ -33,6 +33,7 @@ interface TimelineContextType {
   removeClip: (index: number) => void;
   setActiveClipIndex: (index: number) => void;
   setClips: (clips: VideoClip[]) => void;
+  setTimeline: (timeline: TimelineEvent[]) => void;
   addTimelineEvent: (event: Omit<TimelineEvent, "id">) => void;
   removeTimelineEvent: (id: string) => void;
   clearTimeline: () => void;
@@ -104,6 +105,7 @@ export function SelectedVideoProvider({ children }: { children: ReactNode }) {
       removeClip, 
       setActiveClipIndex, 
       setClips,
+      setTimeline,
       addTimelineEvent,
       removeTimelineEvent,
       clearTimeline,
