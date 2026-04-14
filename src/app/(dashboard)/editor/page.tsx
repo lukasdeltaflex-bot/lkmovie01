@@ -621,7 +621,6 @@ function EditorContent() {
                                 key={idx} 
                                 className="inline-block transition-all duration-200 relative"
                                 style={{
-                                  color: idx === activeWordIndex ? currentPreset.highlight : 'inherit',
                                   transform: idx === activeWordIndex ? 'scale(1.18) translateY(-2px) rotate(-1deg)' : 'scale(1)',
                                   filter: idx === activeWordIndex ? `drop-shadow(0 0 12px ${currentPreset.highlight})` : 'none',
                                   backgroundColor: (globalSubtitle.preset === 'captionBox' && idx === activeWordIndex) ? '#ffffff' : 'transparent',
