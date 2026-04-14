@@ -15,12 +15,73 @@ import axios from "axios";
 type AspectRatio = "16:9" | "9:16" | "1:1";
 type EditorTab = "video" | "legendas" | "audio" | "watermark" | "exportar";
 
-const MOCK_SUBTITLES = [
-  { start: 0, end: 2, pt: "Bem-vindo ao LKMOVIE01!", en: "Welcome to LKMOVIE01!" },
-  { start: 2, end: 5, pt: "Este é o novo editor atualizado.", en: "This is the new updated editor." },
-  { start: 5, end: 8, pt: "As legendas acompanham o vídeo.", en: "Subtitles follow the video." },
-  { start: 8, end: 15, pt: "É possível ouvir a música de fundo.", en: "You can hear the background music." }
-];
+// Legendas dinâmicas baseadas na timeline
+const getActiveSubtitle = (timeline: TimelineEvent[], time: number) => {
+  return timeline.find(e => e.type === "subtitle" && time >= e.startTime && time <= e.startTime + e.duration);
+};
+
+const SUBTITLE_PRESETS = {
+  tiktok: {
+    font: 'Bebas Neue',
+    color: '#ffffff',
+    highlight: '#fbbf24',
+    shadow: '0 0.05em 0 #000, 0 0.1em 0.2em rgba(0,0,0,0.8)',
+    stroke: '1.5px #000',
+    case: 'uppercase',
+    weight: '900',
+    bg: 'transparent'
+  },
+  mrbeast: {
+    font: 'Montserrat',
+    color: '#ffffff',
+    highlight: '#22c55e',
+    shadow: '0 0.1em 0 #ef4444, 0 0.2em 0.4em rgba(0,0,0,0.5)',
+    stroke: '2px #000',
+    case: 'uppercase',
+    weight: '900',
+    bg: 'transparent'
+  },
+  captionBox: {
+    font: 'Poppins',
+    color: '#ffffff',
+    highlight: '#ffffff',
+    shadow: 'none',
+    stroke: 'none',
+    case: 'none',
+    weight: '700',
+    bg: 'rgba(0,0,0,0.85)'
+  },
+  clean: {
+    font: 'Montserrat',
+    color: '#ffffff',
+    highlight: '#3b82f6',
+    shadow: '0 2px 4px rgba(0,0,0,0.5)',
+    stroke: 'none',
+    case: 'none',
+    weight: '700',
+    bg: 'rgba(0,0,0,0.4)'
+  },
+  minimal: {
+    font: 'Inter',
+    color: '#ffffff',
+    highlight: '#ffffff',
+    shadow: 'none',
+    stroke: 'none',
+    case: 'none',
+    weight: '500',
+    bg: 'transparent'
+  },
+  highContrast: {
+    font: 'Poppins',
+    color: '#ffffff',
+    highlight: '#fbbf24',
+    shadow: 'none',
+    stroke: 'none',
+    case: 'uppercase',
+    weight: '900',
+    bg: '#000000'
+  }
+};
 
 const MOCK_TRACKS = [
   { name: "Epic Cinematic", artist: "AudioHero", style: "Epic", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", viral: true },
@@ -82,10 +143,14 @@ function EditorContent() {
     text: "DIGITE SUA LEGENDA",
     textEn: "TYPE YOUR SUBTITLE",
     color: "#ffffff",
-    size: 24,
-    font: "Inter",
-    y: 80,
+    size: 42,
+    font: "Bebas Neue",
+    y: 75,
     type: "pt" as "none" | "pt" | "en" | "both",
+    preset: "tiktok" as keyof typeof SUBTITLE_PRESETS,
+    showBg: false,
+    useAnimation: true,
+    animationType: "pop" as "pop" | "slide" | "glitch" | "fade",
   });
 
   const [watermark, setWatermark] = useState({
@@ -424,11 +489,28 @@ function EditorContent() {
 
   // Subtitle Synchronization Logic
   const currentSubtitleObj = useMemo(() => {
-    return MOCK_SUBTITLES.find(s => currentTime >= s.start && currentTime <= s.end);
-  }, [currentTime]);
+    return timeline.find(s => s.type === "subtitle" && currentTime >= s.startTime && currentTime <= (s.startTime + s.duration));
+  }, [timeline, currentTime]);
 
-  const activeSubtitleText = currentSubtitleObj?.pt || globalSubtitle.text;
-  const activeSubtitleTextEn = currentSubtitleObj?.en || globalSubtitle.textEn;
+  const activeSubtitleText = currentSubtitleObj ? (currentSubtitleObj.content) : globalSubtitle.text;
+  const activeSubtitleTextEn = currentSubtitleObj ? (currentSubtitleObj.metadata?.en || "") : globalSubtitle.textEn;
+
+  // Professional Word Highlighting Logic
+  const subtitleWords = useMemo(() => {
+    if (!activeSubtitleText) return [];
+    const text = globalSubtitle.preset === 'tiktok' || (SUBTITLE_PRESETS[globalSubtitle.preset as keyof typeof SUBTITLE_PRESETS]?.case === 'uppercase')
+      ? activeSubtitleText.toUpperCase() 
+      : activeSubtitleText;
+    return text.split(' ');
+  }, [activeSubtitleText, globalSubtitle.preset]);
+
+  const activeWordIndex = useMemo(() => {
+    if (!currentSubtitleObj || subtitleWords.length === 0) return -1;
+    const progress = (currentTime - currentSubtitleObj.startTime) / currentSubtitleObj.duration;
+    return Math.floor(progress * subtitleWords.length);
+  }, [currentTime, currentSubtitleObj, subtitleWords]);
+
+  const currentPreset = SUBTITLE_PRESETS[globalSubtitle.preset as keyof typeof SUBTITLE_PRESETS] || SUBTITLE_PRESETS.tiktok;
 
   return (
     <div className="h-[92vh] flex flex-col bg-[#0a0a0a] text-white overflow-hidden select-none">
@@ -509,35 +591,69 @@ function EditorContent() {
                    </div>
                  )}
 
-                 {/* Subtitle Rendering - Improved Legibility and Dual Layout */}
+                 {/* Subtitle Rendering - Professional TikTok/CapCut Level */}
                  {globalSubtitle.type !== "none" && (
-                   <div 
-                     className="absolute left-1/2 -translate-x-1/2 cursor-ns-resize select-none active:scale-105 transition-all w-[90%] flex flex-col items-center z-30"
-                     onPointerDown={(e) => { e.preventDefault(); setIsDragging("subtitle"); }}
-                     style={{ top: `${globalSubtitle.y}%` }}
-                   >
-                      {(globalSubtitle.type === "pt" || globalSubtitle.type === "both") && (
-                        <div className="px-6 py-3 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 text-center font-black italic uppercase shadow-[0_10px_30px_rgba(0,0,0,0.5)] leading-tight mb-2"
-                             style={{ 
-                               color: globalSubtitle.color, 
-                               fontSize: `${globalSubtitle.size}px`, 
-                               fontFamily: `${globalSubtitle.font}, sans-serif`,
-                               textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
-                               letterSpacing: '0.02em'
-                             }}>
-                          {activeSubtitleText}
-                        </div>
-                      )}
-                      {(globalSubtitle.type === "en" || globalSubtitle.type === "both") && (
-                        <div className="px-4 py-2 rounded-lg bg-yellow-500 text-black text-center font-black italic uppercase shadow-[0_5px_15px_rgba(0,0,0,0.3)] leading-tight"
-                             style={{ 
-                               fontSize: `${globalSubtitle.size * 0.75}px`, 
-                               fontFamily: `${globalSubtitle.font}, sans-serif`,
-                               letterSpacing: '0.01em'
-                             }}>
-                          {activeSubtitleTextEn}
-                        </div>
-                      )}
+                    <div 
+                      key={`${activeSubtitleText}-${globalSubtitle.animationType}`} // Key to trigger entrance animation on text change
+                      className={`absolute left-1/2 -translate-x-1/2 cursor-ns-resize select-none active:scale-105 transition-all w-[95%] flex flex-col items-center z-[60] ${globalSubtitle.useAnimation ? `animate-${globalSubtitle.animationType}` : ''}`}
+                      onPointerDown={(e) => { e.preventDefault(); setIsDragging("subtitle"); }}
+                      style={{ top: `${globalSubtitle.y}%` }}
+                    >
+                      <div className="flex flex-col items-center gap-4">
+                        {(globalSubtitle.type === "pt" || globalSubtitle.type === "both") && activeSubtitleText && (
+                          <div 
+                            className={`px-8 py-4 rounded-2xl text-center flex flex-wrap justify-center gap-[0.2em] leading-[1.1] transform perspective-1000`}
+                            style={{ 
+                              backgroundColor: globalSubtitle.showBg ? currentPreset.bg : 'transparent',
+                              backdropFilter: globalSubtitle.showBg && currentPreset.bg !== 'transparent' ? 'blur(10px)' : 'none',
+                              color: globalSubtitle.color, 
+                              fontSize: `${globalSubtitle.size}px`, 
+                              fontFamily: `'${currentPreset.font}', sans-serif`,
+                              fontWeight: currentPreset.weight,
+                              fontStyle: 'italic',
+                              textShadow: currentPreset.shadow,
+                              WebkitTextStroke: currentPreset.stroke,
+                              letterSpacing: '-0.02em',
+                            }}
+                          >
+                            {subtitleWords.map((word, idx) => (
+                              <span 
+                                key={idx} 
+                                className="inline-block transition-all duration-200 relative"
+                                style={{
+                                  color: idx === activeWordIndex ? currentPreset.highlight : 'inherit',
+                                  transform: idx === activeWordIndex ? 'scale(1.18) translateY(-2px) rotate(-1deg)' : 'scale(1)',
+                                  filter: idx === activeWordIndex ? `drop-shadow(0 0 12px ${currentPreset.highlight})` : 'none',
+                                  backgroundColor: (globalSubtitle.preset === 'captionBox' && idx === activeWordIndex) ? '#ffffff' : 'transparent',
+                                  color: (globalSubtitle.preset === 'captionBox' && idx === activeWordIndex) ? '#000000' : (idx === activeWordIndex ? currentPreset.highlight : 'inherit'),
+                                  padding: globalSubtitle.preset === 'captionBox' ? '0 0.2em' : '0',
+                                  borderRadius: '0.2em',
+                                }}
+                              >
+                                {word}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {(globalSubtitle.type === "en" || globalSubtitle.type === "both") && activeSubtitleTextEn && (
+                          <div 
+                            className="px-6 py-2.5 rounded-xl text-center font-black italic uppercase leading-none shadow-2xl transition-all border border-white/10"
+                            style={{ 
+                              backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                              backdropFilter: 'blur(8px)',
+                              color: '#fbbf24',
+                              fontSize: `${globalSubtitle.size * 0.55}px`, 
+                              fontFamily: `'Montserrat', sans-serif`,
+                              textShadow: '0 2px 4px rgba(0,0,0,0.8)',
+                              marginTop: '-0.3em',
+                              letterSpacing: '0.05em',
+                              opacity: 0.9
+                            }}
+                          >
+                            {activeSubtitleTextEn}
+                          </div>
+                        )}
+                      </div>
                    </div>
                  )}
 
@@ -553,33 +669,38 @@ function EditorContent() {
               </div>
             </div>
 
-            {/* Dedicated Player Controls Area - No Overlap with Video Subtitles */}
-            <div className="h-28 border-t border-white/5 bg-[#0d0d0d] flex flex-col items-center justify-center gap-3 px-10 z-50">
-               <div className="w-full max-w-2xl space-y-3">
+            {/* Player Controls Area - Fixed positioning to avoid any hover overlap */}
+            <div className="h-24 shrink-0 border-t border-white/5 bg-[#0d0d0d] flex flex-col items-center justify-center gap-2 px-10 z-[70] shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
+               <div className="w-full max-w-2xl space-y-1">
                   {/* Progress Bar */}
-                  <div className="w-full space-y-1">
-                    <div className="h-2 w-full bg-white/5 rounded-full relative cursor-pointer group" onClick={(e) => {
+                  <div className="w-full mb-1">
+                    <div className="h-1.5 w-full bg-white/10 rounded-full relative cursor-pointer group hover:h-2 transition-all" onClick={(e) => {
                       const rect = e.currentTarget.getBoundingClientRect();
                       const x = e.clientX - rect.left;
                       handleSeek((x / rect.width) * duration);
                     }}>
-                       <div className="absolute top-0 left-0 h-full bg-blue-600 rounded-full shadow-[0_0_10px_rgba(37,99,235,0.5)] transition-all duration-75" style={{ width: `${(currentTime/duration)*100}%` }}></div>
-                       <div className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-xl opacity-0 group-hover:opacity-100 transition-opacity" style={{ left: `${(currentTime/duration)*100}%`, transform: 'translate(-50%, -50%)' }}></div>
-                    </div>
-                    <div className="flex justify-between text-[10px] font-black text-gray-600 uppercase tracking-[0.2em]">
-                       <span>{Math.floor(currentTime / 60)}:{(Math.floor(currentTime % 60)).toString().padStart(2, '0')}</span>
-                       <span className="text-gray-400">STUDIO PREVIEW MASTER</span>
-                       <span>{Math.floor(duration / 60)}:{(Math.floor(duration % 60)).toString().padStart(2, '0')}</span>
+                       <div className="absolute top-0 left-0 h-full bg-blue-600 rounded-full shadow-[0_0_15px_rgba(37,99,235,0.8)]" style={{ width: `${(currentTime/duration)*100}%` }}></div>
+                       <div className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-white border-2 border-blue-600 rounded-full shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity" style={{ left: `${(currentTime/duration)*100}%`, transform: 'translate(-50%, -50%)' }}></div>
                     </div>
                   </div>
 
-                  {/* Playback Controls */}
-                  <div className="flex items-center justify-center gap-10">
-                     <button className="text-xl opacity-30 hover:opacity-100 transition-all hover:scale-110">⏮</button>
-                     <button onClick={togglePlay} className="w-14 h-14 bg-white text-black rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)]">
-                        <span className="text-2xl">{isPlaying ? '⏸' : '▶'}</span>
-                     </button>
-                     <button className="text-xl opacity-30 hover:opacity-100 transition-all hover:scale-110">⏭</button>
+                  {/* Playback Controls & Time */}
+                  <div className="flex items-center justify-between w-full h-8">
+                     <div className="w-20 text-[10px] font-black text-gray-500 tabular-nums">
+                        {Math.floor(currentTime / 60)}:{(Math.floor(currentTime % 60)).toString().padStart(2, '0')}
+                     </div>
+                     
+                     <div className="flex items-center gap-6">
+                        <button className="text-gray-500 hover:text-white transition-colors" title="Início">⏮</button>
+                        <button onClick={togglePlay} className="w-12 h-12 bg-white text-black rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-xl">
+                           <span className="text-xl ml-0.5">{isPlaying ? '⏸' : '▶'}</span>
+                        </button>
+                        <button className="text-gray-500 hover:text-white transition-colors" title="Fim">⏭</button>
+                     </div>
+
+                     <div className="w-20 text-[10px] font-black text-gray-400 text-right tabular-nums">
+                        {Math.floor(duration / 60)}:{(Math.floor(duration % 60)).toString().padStart(2, '0')}
+                     </div>
                   </div>
                </div>
             </div>
@@ -654,12 +775,48 @@ function EditorContent() {
                     )}
                     
                     <div className="space-y-4">
-                       <label className="text-xs font-black text-gray-500 uppercase tracking-widest">Estilização Tipográfica</label>
+                       <label className="text-xs font-black text-gray-500 uppercase tracking-widest italic">Presets Profissionais</label>
+                       <div className="grid grid-cols-2 gap-3">
+                          {(Object.keys(SUBTITLE_PRESETS) as Array<keyof typeof SUBTITLE_PRESETS>).map(p => (
+                            <button 
+                              key={p} 
+                              onClick={() => setGlobalSubtitle(s => ({ ...s, preset: p }))}
+                              className={`py-3 rounded-xl border-2 text-[10px] font-black uppercase tracking-widest transition-all ${globalSubtitle.preset === p ? 'border-blue-500 bg-blue-500/10 text-blue-500' : 'border-white/5 bg-white/5 text-gray-500 hover:border-white/10'}`}
+                            >
+                              {p === 'tiktok' ? 'Viral TikTok' : p === 'mrbeast' ? 'MrBeast Pro' : p === 'captionBox' ? 'Caption Box' : p === 'clean' ? 'YouTube Clean' : p === 'highContrast' ? 'High Contrast' : 'Minimal'}
+                            </button>
+                          ))}
+                       </div>
+                    </div>
+
+                    <div className="space-y-4">
+                       <label className="text-xs font-black text-gray-500 uppercase tracking-widest">Estilização Manual</label>
                        <div className="space-y-5 p-6 bg-white/5 rounded-3xl border border-white/5">
+                          <div className="flex items-center justify-between mb-2">
+                             <label className="text-[10px] text-gray-600 font-black uppercase">Fundo & Animação</label>
+                             <div className="flex gap-4">
+                               <button onClick={() => setGlobalSubtitle(s => ({...s, showBg: !s.showBg}))} className={`text-[9px] font-black uppercase px-3 py-1 rounded-full border transition-all ${globalSubtitle.showBg ? 'bg-blue-600 border-blue-600 text-white' : 'border-white/10 text-gray-600'}`}>BG</button>
+                               <button onClick={() => setGlobalSubtitle(s => ({...s, useAnimation: !s.useAnimation}))} className={`text-[9px] font-black uppercase px-3 py-1 rounded-full border transition-all ${globalSubtitle.useAnimation ? 'bg-blue-600 border-blue-600 text-white' : 'border-white/10 text-gray-600'}`}>ANIM</button>
+                             </div>
+                          </div>
+                          <div className="space-y-3">
+                             <label className="text-[10px] text-gray-600 font-black uppercase tracking-widest">Tipo de Entrada</label>
+                             <div className="grid grid-cols-4 gap-2">
+                                {(["pop", "slide", "fade", "glitch"] as const).map(a => (
+                                  <button 
+                                    key={a} 
+                                    onClick={() => setGlobalSubtitle(s => ({...s, animationType: a}))} 
+                                    className={`py-2 rounded-lg border text-[8px] font-black uppercase transition-all ${globalSubtitle.animationType === a ? 'border-blue-500 bg-blue-500/10 text-blue-500' : 'border-white/5 bg-white/5 text-gray-500'}`}
+                                  >
+                                    {a}
+                                  </button>
+                                ))}
+                             </div>
+                          </div>
                           <div className="space-y-2">
                              <label className="text-[10px] text-gray-600 font-black uppercase tracking-widest">Família da Fonte</label>
                              <select value={globalSubtitle.font} onChange={e => setGlobalSubtitle(s => ({...s, font: e.target.value}))} className="w-full bg-black border border-white/10 rounded-xl h-12 px-4 text-sm font-bold outline-none focus:border-blue-500 cursor-pointer">
-                                {["Inter", "Arial", "Montserrat", "Poppins", "Bebas Neue", "Roboto"].map(f => <option key={f} value={f}>{f}</option>)}
+                                {["Bebas Neue", "Montserrat", "Poppins", "Inter", "Arial", "Roboto"].map(f => <option key={f} value={f}>{f}</option>)}
                              </select>
                           </div>
                           <div className="space-y-3">
@@ -906,9 +1063,54 @@ function EditorContent() {
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #333; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
 
-        /* Ensure font application */
-        * {
-          font-family: 'Inter', sans-serif;
+        /* Legendas custom fonts application */
+        .subtitle-text {
+          font-family: inherit;
+        }
+        @keyframes subtitle-in {
+          0% { opacity: 0; transform: scale(0.9) translateY(10px); }
+          100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .animate-subtitle-in {
+          animation: subtitle-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes pop {
+          0% { opacity: 0; transform: scale(0.5) translate(-50%, 20px); }
+          50% { transform: scale(1.1) translate(-50%, -5px); }
+          100% { opacity: 1; transform: scale(1) translate(-50%, 0); }
+        }
+        .animate-pop {
+          animation: pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+          transform-origin: center;
+        }
+
+        @keyframes slide {
+          0% { opacity: 0; transform: translate(-50%, 40px); }
+          100% { opacity: 1; transform: translate(-50%, 0); }
+        }
+        .animate-slide {
+          animation: slide 0.3s ease-out forwards;
+        }
+
+        @keyframes fade {
+          0% { opacity: 0; filter: blur(10px); }
+          100% { opacity: 1; filter: blur(0); }
+        }
+        .animate-fade {
+          animation: fade 0.3s ease-in forwards;
+        }
+
+        @keyframes glitch {
+          0% { clip-path: inset(80% 0 0 0); transform: translate(-50%, -10px); opacity: 0.5; }
+          20% { clip-path: inset(20% 0 50% 0); transform: translate(-50%, 5px); }
+          40% { clip-path: inset(50% 0 30% 0); transform: translate(-50%, -5px); }
+          60% { clip-path: inset(10% 0 70% 0); transform: translate(-50%, 2px); }
+          80% { clip-path: inset(40% 0 10% 0); transform: translate(-50%, -2px); }
+          100% { clip-path: inset(0 0 0 0); transform: translate(-50%, 0); opacity: 1; }
+        }
+        .animate-glitch {
+          animation: glitch 0.4s steps(2, end) forwards;
         }
       `}</style>
     </div>
