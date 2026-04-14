@@ -6,7 +6,7 @@ import { useBranding } from "@/context/branding-context";
 import { PLAN_LIMITS } from "@/lib/utils/usage-limits";
 
 export function PlanManager() {
-  const { branding, setBranding } = useBranding();
+  const { branding, setBranding, showToast } = useBranding();
   const plan = branding.plan || "free";
   const usage = branding.usage || { searchesCount: 0, projectsCount: 0, rendersCount: 0 };
   const limits = PLAN_LIMITS[plan as keyof typeof PLAN_LIMITS];
