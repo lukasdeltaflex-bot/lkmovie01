@@ -180,7 +180,7 @@ function EditorContent() {
               id: p.videoId, 
               title: p.title, 
               thumbnail: p.thumbnail, 
-              channelTitle: p.channelTitle,
+              channel: p.channelTitle,
               zoom: 100 
             }]);
           } else {
@@ -189,7 +189,7 @@ function EditorContent() {
                id: p.videoId, 
                title: p.title, 
                thumbnail: p.thumbnail, 
-               channelTitle: p.channelTitle,
+               channel: p.channelTitle,
                zoom: 100 
              }]);
              setTimeline([{
