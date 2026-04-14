@@ -45,7 +45,7 @@ export default function DashboardLayout({
 
   return (
     <SelectedVideoProvider>
-      <div className="flex h-screen bg-gray-50 dark:bg-[#050505] text-gray-900 dark:text-gray-100 transition-colors duration-300 overflow-hidden font-sans">
+      <div className="flex h-screen bg-background text-foreground transition-colors duration-300 overflow-hidden font-sans">
         <Sidebar />
         <main 
           className={`flex-1 overflow-y-auto px-4 py-8 md:px-8 lg:px-12 md:py-10 transition-all duration-500 w-full relative ${

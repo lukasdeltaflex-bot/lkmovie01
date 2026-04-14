@@ -5,11 +5,11 @@
 @layer base {
   :root {
     --background: #ffffff;
-    --foreground: #09090b;
-    --surface: #f4f4f5;
+    --foreground: #111827;
+    --surface: #f9fafb;
     --border: rgba(0, 0, 0, 0.08);
     --primary: #2563eb;
-    --muted: #71717a;
+    --muted: #6b7280;
   }
 
   .dark {
@@ -18,7 +18,7 @@
     --surface: #111111;
     --border: rgba(255, 255, 255, 0.05);
     --primary: #3b82f6;
-    --muted: #6b7280;
+    --muted: #9ca3af;
   }
 }
 

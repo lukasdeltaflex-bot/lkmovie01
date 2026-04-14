@@ -206,7 +206,7 @@ export default function BuscarCenasPage() {
                        value={query}
                        onChange={(e) => setQuery(e.target.value)}
                        placeholder="Busque cenas épicas..."
-                       className="w-full h-16 md:h-20 rounded-2xl text-lg px-8 bg-white dark:bg-[#0a0a0a] border border-black/5 dark:border-white/10 shadow-2xl text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:ring-2 focus:ring-blue-500/40 transition-all font-bold"
+                       className="w-full h-16 md:h-20 rounded-2xl text-lg px-8 bg-background border border-border-custom shadow-2xl text-foreground placeholder:text-muted-custom focus:ring-2 focus:ring-blue-500/40 transition-all font-bold"
                      />
                     {query && (
                       <button 
@@ -261,12 +261,12 @@ export default function BuscarCenasPage() {
       {/* RESULTADOS */}
       {(loading || results.length > 0) && (
         <div className="space-y-12 animate-in fade-in slide-in-from-bottom-5 duration-700">
-           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-gray-100 dark:border-white/5 pb-8">
+           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-border-custom pb-8">
               <div className="space-y-2">
-                 <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter uppercase italic">Cenas Filtradas</h2>
+                 <h2 className="text-3xl font-black text-foreground tracking-tighter uppercase italic">Cenas Filtradas</h2>
                 <div className="flex items-center gap-4">
-                  <span className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">{results.length} EXIBIDAS</span>
-                  <div className="w-1 h-1 rounded-full bg-gray-800"></div>
+                  <span className="text-[10px] font-black text-muted-custom uppercase tracking-[0.2em]">{results.length} EXIBIDAS</span>
+                  <div className="w-1 h-1 rounded-full bg-blue-500/30"></div>
                   <span className="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em]">{totalResults.toLocaleString()} TOTAIS</span>
                 </div>
              </div>
@@ -288,7 +288,7 @@ export default function BuscarCenasPage() {
                 return (
                   <div 
                     key={video.id} 
-                    className="group bg-[#0d0d0d] border border-white/5 rounded-2xl overflow-hidden shadow-2xl hover:border-blue-500/50 transition-all flex flex-col cursor-pointer transform hover:scale-105 duration-300 relative"
+                    className="group bg-surface border border-border-custom rounded-2xl overflow-hidden shadow-2xl hover:border-blue-500/50 transition-all flex flex-col cursor-pointer transform hover:scale-105 duration-300 relative"
                     onClick={() => handleSelectVideo(video)}
                   >
                     <div className="aspect-video relative overflow-hidden bg-black rounded-2xl">
@@ -305,9 +305,9 @@ export default function BuscarCenasPage() {
                       </button>
                     </div>
                     <div className="p-6 space-y-4">
-                      <h3 className="text-sm font-black text-white line-clamp-2 leading-[1.3] uppercase italic tracking-tighter">{video.title}</h3>
-                      <div className="flex items-center justify-between border-t border-white/5 pt-4">
-                         <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest truncate max-w-[120px]">{video.channel}</span>
+                      <h3 className="text-sm font-black text-foreground line-clamp-2 leading-[1.3] uppercase italic tracking-tighter">{video.title}</h3>
+                      <div className="flex items-center justify-between border-t border-border-custom pt-4">
+                         <span className="text-[9px] font-black text-muted-custom uppercase tracking-widest truncate max-w-[120px]">{video.channel}</span>
                          <span className="px-2 py-1 bg-blue-500/10 text-blue-500 text-[8px] font-black rounded-lg uppercase">HQ / 4K</span>
                       </div>
                     </div>
