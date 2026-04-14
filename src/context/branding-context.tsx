@@ -112,12 +112,8 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
     setBrandingState(updated);
 
     if (persist && user && db) {
-      try {
-        const docRef = doc(db, "user_settings", user.uid);
-        await setDoc(docRef, updated, { merge: true });
-      } catch (error) {
-        console.error("Erro ao persistir branding no Firestore:", error);
-      }
+      const docRef = doc(db, "user_settings", user.uid);
+      await setDoc(docRef, updated, { merge: true });
     }
   };
 
