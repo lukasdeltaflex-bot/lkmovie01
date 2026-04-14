@@ -15,12 +15,7 @@ interface ActivityLogProps {
 }
 
 export function ActivityLog({ 
-  activities = [
-    { id: "1", type: "search", title: "Busca por 'Cinematic Drone Shots'", time: "Há 5 min", status: "success" },
-    { id: "2", type: "project", title: "Novo Projeto: Reels Viagem 2026", time: "Há 15 min", status: "success" },
-    { id: "3", type: "render", title: "Render: YouTube Shorts #04", time: "Há 1h", status: "success" },
-    { id: "4", type: "render", title: "Render: Ad Campaign V2", time: "Há 3h", status: "error" },
-  ] 
+  activities = [] 
 }: ActivityLogProps) {
   
   const getIcon = (type: string) => {
@@ -49,23 +44,30 @@ export function ActivityLog({
       </div>
 
       <div className="space-y-6">
-        {activities.map((activity) => (
-          <div key={activity.id} className="flex items-center gap-6 group">
-            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-xl shadow-inner bg-gray-50 dark:bg-black group-hover:scale-110 transition-transform border border-gray-100 dark:border-gray-800`}>
-              {getIcon(activity.type)}
+        {activities.length > 0 ? (
+          activities.map((activity) => (
+            <div key={activity.id} className="flex items-center gap-6 group">
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-xl shadow-inner bg-gray-50 dark:bg-black group-hover:scale-110 transition-transform border border-gray-100 dark:border-gray-800`}>
+                {getIcon(activity.type)}
+              </div>
+              <div className="flex-1 space-y-1">
+                 <div className="flex justify-between items-start">
+                    <p className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-tighter group-hover:text-blue-500 transition-colors">{activity.title}</p>
+                    <span className={`w-2 h-2 rounded-full mt-1.5 ${getStatusColor(activity.status)}`}></span>
+                 </div>
+                 <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                    <span>{activity.type.toUpperCase()}</span>
+                    <span>{activity.time}</span>
+                 </div>
+              </div>
             </div>
-            <div className="flex-1 space-y-1">
-               <div className="flex justify-between items-start">
-                  <p className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-tighter group-hover:text-blue-500 transition-colors">{activity.title}</p>
-                  <span className={`w-2 h-2 rounded-full mt-1.5 ${getStatusColor(activity.status)}`}></span>
-               </div>
-               <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                  <span>{activity.type.toUpperCase()}</span>
-                  <span>{activity.time}</span>
-               </div>
-            </div>
+          ))
+        ) : (
+          <div className="py-10 text-center space-y-3">
+             <div className="text-4xl opacity-20">📂</div>
+             <p className="text-[10px] font-black text-muted-custom uppercase tracking-widest">Nenhuma atividade registrada ainda</p>
           </div>
-        ))}
+        )}
       </div>
 
       <div className="pt-6 border-t border-gray-50 dark:border-gray-800">

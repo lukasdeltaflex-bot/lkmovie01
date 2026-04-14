@@ -14,17 +14,9 @@ interface ProductionChartProps {
 }
 
 export function ProductionChart({ 
-  data = [
-    { day: "Seg", value: 12 },
-    { day: "Ter", value: 18 },
-    { day: "Qua", value: 15 },
-    { day: "Qui", value: 25 },
-    { day: "Sex", value: 32 },
-    { day: "Sáb", value: 28 },
-    { day: "Dom", value: 40 },
-  ],
+  data = [],
   color = "#3b82f6",
-  title = "Produção de Vídeos (7 Dias)"
+  title = "Produção de Vídeos"
 }: ProductionChartProps) {
   
   const maxValue = Math.max(...data.map(d => d.value), 10);
@@ -150,14 +142,9 @@ export function ProductionChart({
          <div className="flex gap-6">
             <div className="space-y-1">
                <p className="text-[10px] font-black text-gray-400 uppercase">Média Diária</p>
-               <p className="text-xl font-black text-gray-900 dark:text-white italic">24.2</p>
-            </div>
-            <div className="space-y-1">
-               <p className="text-[10px] font-black text-gray-400 uppercase">Crescimento</p>
-               <p className="text-xl font-black text-green-500 italic">+12%</p>
+               <p className="text-xl font-black text-gray-900 dark:text-white italic">{data.length > 0 ? (data.reduce((acc, curr) => acc + curr.value, 0) / data.length).toFixed(1) : "0"}</p>
             </div>
          </div>
-         <button className="text-[10px] font-black uppercase text-blue-500 hover:tracking-widest transition-all">Exportar Dados ➔</button>
       </div>
     </div>
   );

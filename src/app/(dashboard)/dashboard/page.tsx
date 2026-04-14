@@ -80,14 +80,13 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex flex-wrap gap-4">
-           {/* REFERRAL QUICK ACCESS */}
-           <div className="bg-surface border border-border-custom p-5 rounded-3xl flex items-center gap-6 shadow-sm">
-              <div>
-                 <p className="text-[10px] font-black text-muted-custom uppercase tracking-widest leading-none">Seu Código</p>
-                 <p className="text-lg font-black text-blue-600 dark:text-blue-400 italic mt-1">{referralCode}</p>
-              </div>
-              <Button onClick={copyReferral} variant="outline" className="h-12 px-6 rounded-2xl border-border-custom text-[9px] font-black uppercase">Indicador PRO 🚀</Button>
-           </div>
+            <div className="bg-surface border border-border-custom p-5 rounded-3xl flex items-center gap-6 shadow-sm">
+               <div>
+                  <p className="text-[10px] font-black text-muted-custom uppercase tracking-widest leading-none">Seu Código</p>
+                  <p className="text-lg font-black text-blue-600 dark:text-blue-400 italic mt-1">{referralCode}</p>
+               </div>
+               <Button onClick={copyReferral} variant="outline" className="h-12 px-6 rounded-2xl border-border-custom text-[9px] font-black uppercase">Copiar Link 🔗</Button>
+            </div>
            
            <Button onClick={() => setShowAutoModal(true)} className="h-20 px-10 rounded-3xl bg-blue-600 text-white font-black italic shadow-2xl hover:scale-105 active:scale-95 transition-all w-full sm:w-auto">GERAÇÃO MÁGICA 🪄</Button>
         </div>
@@ -99,9 +98,9 @@ export default function DashboardPage() {
            <ProductionChart color="#3b82f6" />
            
            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <MetricCard title="CRESCIMENTO ORGÂNICO" value={usage.referralsCount?.toString() || "0"} icon="📈" badge="Indicados" trend="+100%" color="#10b981" />
-              <MetricCard title="ENGAJAMENTO VIRAL" value={recentProjects.length.toString()} icon="🔥" badge="Atividade" trend="Ativo" color="#f59e0b" />
-           </div>
+               <MetricCard title="PROJETOS TOTAIS" value={usage.projectsCount?.toString() || "0"} icon="📂" badge="Projetos" trend="" color="#3b82f6" />
+               <MetricCard title="CENAS BUSCADAS" value={usage.searchesCount?.toString() || "0"} icon="🔍" badge="Buscas" trend="" color="#8b5cf6" />
+            </div>
         </div>
 
         <div className="lg:col-span-4 space-y-8">

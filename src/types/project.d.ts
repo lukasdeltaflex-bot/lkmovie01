@@ -77,6 +77,8 @@ export interface UserBranding {
   defaultWatermark: string;
   defaultEndScreen: string;
   appearanceMode: "light" | "dark" | "system";
+  photoURL?: string;
+  displayName?: string;
 }
 
 export interface UserUsage {

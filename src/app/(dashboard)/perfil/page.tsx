@@ -1,26 +1,35 @@
-"use client";
-
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/context/auth-context";
 import { useBranding } from "@/context/branding-context";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-
+import { storage } from "@/lib/firebase/config";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+ 
 import { PlanManager } from "@/components/profile/PlanManager";
-
+ 
 export default function PerfilPage() {
   const { user } = useAuth();
-  const { branding, showToast } = useBranding();
+  const { branding, setBranding, showToast } = useBranding();
   
-  const [name, setName] = useState(user?.email?.split('@')[0] || "");
+  const [name, setName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+ 
+  // Sincroniza estado local com dados reais do branding
+  useEffect(() => {
+    if (branding) {
+      setName(branding.displayName || user?.email?.split('@')[0] || "");
+      setAvatarPreview(branding.photoURL || null);
+    }
+  }, [branding, user]);
   
   const handleAvatarClick = () => {
     fileInputRef.current?.click();
   };
-
+ 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -28,6 +37,7 @@ export default function PerfilPage() {
         showToast("Imagem muito grande (máx 2MB)", "error");
         return;
       }
+      setSelectedFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setAvatarPreview(reader.result as string);
@@ -35,17 +45,38 @@ export default function PerfilPage() {
       reader.readAsDataURL(file);
     }
   };
-
+ 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
+    
     setIsSaving(true);
-    // Simulação de persistência (Em produção aqui salvaria no Firestore/Auth)
-    setTimeout(() => {
-      setIsSaving(false);
+    try {
+      let photoURL = branding.photoURL;
+ 
+      // Upload de imagem real se houver arquivo selecionado
+      if (selectedFile && storage) {
+        const fileRef = ref(storage, `profile_photos/${user.uid}`);
+        await uploadBytes(fileRef, selectedFile);
+        photoURL = await getDownloadURL(fileRef);
+      }
+ 
+      // Persistência real no Firestore através do context
+      await setBranding({ 
+        displayName: name, 
+        photoURL 
+      });
+      
       showToast("Perfil atualizado com sucesso!", "success");
-    }, 1000);
+      setSelectedFile(null);
+    } catch (error) {
+      console.error("Erro ao salvar perfil:", error);
+      showToast("Erro ao atualizar perfil", "error");
+    } finally {
+      setIsSaving(false);
+    }
   };
-
+ 
   return (
     <div className="max-w-6xl mx-auto space-y-16 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20 px-4">
       <header className="space-y-4">
@@ -56,10 +87,10 @@ export default function PerfilPage() {
         <h1 className="text-4xl md:text-6xl font-black text-foreground tracking-tighter uppercase italic leading-none">Minha Conta</h1>
         <p className="text-muted-custom font-medium text-lg">Gerencie sua identidade digital e seu plano de produção.</p>
       </header>
-
+ 
       {/* PLAN MANAGEMENT SECTION */}
       <PlanManager />
-
+ 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 pt-10 border-t border-gray-100 dark:border-gray-800">
         {/* Avatar Section */}
         <div className="lg:col-span-4 flex flex-col items-center space-y-8">
@@ -88,19 +119,9 @@ export default function PerfilPage() {
                  <p className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tighter italic">{name}</p>
                  <p className="text-[10px] font-bold text-muted-custom uppercase tracking-widest">ID: {user?.uid.slice(0, 8)}</p>
               </div>
-
-              {/* Personalization Badges */}
-              <div className="flex flex-wrap justify-center gap-2">
-                 <span className="px-3 py-1 bg-gray-100 dark:bg-gray-800 rounded-lg text-[10px] font-black text-gray-500 dark:text-muted-custom uppercase">
-                    {branding.goal || "Objetivo não definido"}
-                 </span>
-                 <span className="px-3 py-1 bg-gray-100 dark:bg-gray-800 rounded-lg text-[10px] font-black text-gray-500 dark:text-muted-custom uppercase">
-                    {branding.stylePreference || "Estilo não definido"}
-                 </span>
-              </div>
            </div>
         </div>
-
+ 
         {/* Form Section */}
         <div className="lg:col-span-8">
            <form onSubmit={handleSave} className="bg-surface border border-border-custom rounded-[3rem] p-12 shadow-2xl space-y-10">
@@ -123,7 +144,7 @@ export default function PerfilPage() {
                     />
                  </div>
               </div>
-
+ 
               <div className="pt-8 border-t border-gray-50 dark:border-gray-800 flex justify-end">
                  <Button 
                     type="submit" 

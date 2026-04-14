@@ -16,12 +16,12 @@ export interface Branding {
   defaultWatermark: string;
   defaultEndScreen: string;
   hasSeenOnboarding: boolean;
-  goal?: string;
-  stylePreference?: string;
   plan?: "free" | "pro";
   usage?: UserUsage;
   analytics?: UserAnalytics;
   referralCode?: string;
+  photoURL?: string;
+  displayName?: string;
 }
 
 interface BrandingContextType {

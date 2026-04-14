@@ -31,9 +31,8 @@ export function PlanManager() {
   };
 
   const handleUpgrade = async () => {
-    // Simulação de upgrade para Pro
-    await setBranding({ plan: "pro" });
-    alert("Parabéns! Você agora é um membro PRO LKMOVIE01. 🚀");
+    // Integração real com gateway de pagamento pode ser adicionada aqui
+    showToast("Assinatura Pro indisponível no momento. Entre em contato com o suporte.", "info");
   };
 
   return (
@@ -107,30 +106,15 @@ export function PlanManager() {
               <div className="absolute -bottom-10 -right-10 text-[10rem] opacity-10 blur-xl pointer-events-none group-hover:rotate-12 transition-transform">💎</div>
            </div>
          ) : (
-           <div className="bg-white dark:bg-gray-900 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 p-10 shadow-2xl space-y-8">
-              <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tighter uppercase italic">Histórico de Cobrança</h3>
-              <div className="space-y-4">
-                 {[
-                   { date: "01 Mar, 2026", amount: "R$ 49.90", status: "Pago", icon: "🧾" },
-                   { date: "01 Fev, 2026", amount: "R$ 49.90", status: "Pago", icon: "🧾" },
-                   { date: "01 Jan, 2026", amount: "R$ 49.90", status: "Pago", icon: "🧾" }
-                 ].map((bill, i) => (
-                   <div key={i} className="flex items-center justify-between p-6 bg-gray-50 dark:bg-black rounded-3xl border border-gray-100 dark:border-gray-800 group hover:border-blue-500/30 transition-all cursor-pointer">
-                      <div className="flex items-center gap-4">
-                         <span className="text-2xl">{bill.icon}</span>
-                         <div className="space-y-0.5">
-                            <p className="text-xs font-black text-gray-900 dark:text-white uppercase tracking-tighter">{bill.date}</p>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase">Assinatura Mensal</p>
-                         </div>
-                      </div>
-                      <div className="text-right">
-                         <p className="text-sm font-black text-gray-900 dark:text-white">{bill.amount}</p>
-                         <p className="text-[10px] font-black text-green-500 uppercase">{bill.status}</p>
-                      </div>
-                   </div>
-                 ))}
-              </div>
-           </div>
+           <div className="bg-white dark:bg-gray-900 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 p-10 shadow-2xl space-y-8 flex items-center justify-center min-h-[400px]">
+            <div className="text-center space-y-4">
+               <div className="text-5xl opacity-20">🧾</div>
+               <p className="text-[10px] font-black text-muted-custom uppercase tracking-widest leading-loose">
+                  Nenhuma fatura gerada.<br />
+                  Seu histórico de cobrança aparecerá aqui.
+               </p>
+            </div>
+         </div>
          )}
       </div>
     </div>
