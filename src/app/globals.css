@@ -4,11 +4,20 @@
 
 @layer base {
   :root {
+    --background: #ffffff;
+    --foreground: #09090b;
+    --surface: #f4f4f5;
+    --border: rgba(0, 0, 0, 0.08);
+    --primary: #2563eb;
+    --muted: #71717a;
+  }
+
+  .dark {
     --background: #0a0a0a;
     --foreground: #ffffff;
     --surface: #111111;
     --border: rgba(255, 255, 255, 0.05);
-    --primary: #2563eb;
+    --primary: #3b82f6;
     --muted: #6b7280;
   }
 }
@@ -50,12 +59,13 @@ h1, h2, h3, h4, .font-poppins {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--border);
   border-radius: 10px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(37, 99, 235, 0.3);
+  background: var(--primary);
+  opacity: 0.5;
 }
 
 .glass {

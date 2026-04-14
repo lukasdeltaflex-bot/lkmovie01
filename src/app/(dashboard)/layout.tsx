@@ -45,28 +45,28 @@ export default function DashboardLayout({
 
   return (
     <SelectedVideoProvider>
-      <div className="flex h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors duration-300 overflow-hidden font-sans">
+      <div className="flex h-screen bg-gray-50 dark:bg-[#050505] text-gray-900 dark:text-gray-100 transition-colors duration-300 overflow-hidden font-sans">
         <Sidebar />
         <main 
-          className={`flex-1 overflow-y-auto px-4 py-8 md:px-12 md:py-10 transition-all duration-500 w-full relative ${
+          className={`flex-1 overflow-y-auto px-4 py-8 md:px-8 lg:px-12 md:py-10 transition-all duration-500 w-full relative ${
             sidebarCollapsed ? "md:ml-20" : "md:ml-72"
           }`}
         >
           {/* Header Global Flutuante */}
-          <div className="flex justify-between md:justify-end items-center sticky top-0 z-[40] mb-12 pointer-events-none">
-             <div className="md:hidden pointer-events-auto bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl p-3 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-2xl w-14 h-14 flex items-center justify-center overflow-hidden active:scale-95 transition-all">
+          <div className="flex justify-between md:justify-end items-center sticky top-0 z-[40] mb-8 pointer-events-none">
+             <div className="md:hidden pointer-events-auto bg-white dark:bg-gray-900 p-3 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-2xl w-14 h-14 flex items-center justify-center overflow-hidden active:scale-95 transition-all">
                 {branding.logo.length > 2 ? (
                   <img src={branding.logo} alt="Logo" className="w-10 h-10 object-contain" />
                 ) : (
                   <span className="text-3xl">{branding.logo}</span>
                 )}
              </div>
-             <div className="pointer-events-auto bg-white/50 dark:bg-gray-900/50 backdrop-blur-xl rounded-full p-1 border border-white/20 dark:border-gray-800 shadow-lg">
+             <div className="pointer-events-auto bg-white/70 dark:bg-gray-900/70 backdrop-blur-xl rounded-full p-1 border border-gray-200 dark:border-gray-800 shadow-lg">
                 <NotificationBell />
              </div>
           </div>
 
-          <div className="max-w-[1600px] mx-auto w-full">
+          <div className="max-w-[1400px] mx-auto w-full">
             {children}
           </div>
         </main>

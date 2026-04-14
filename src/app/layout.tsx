@@ -28,8 +28,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR" suppressHydrationWarning className="dark">
-      <body className={`${inter.variable} ${poppins.variable} antialiased h-screen overflow-hidden bg-[#0a0a0a] text-white transition-colors duration-500 font-sans`}>
+    <html lang="pt-BR" suppressHydrationWarning>
+      <body className={`${inter.variable} ${poppins.variable} antialiased h-screen overflow-hidden transition-colors duration-500 font-sans bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-white`}>
         <AuthProvider>
           <ThemeProvider>
             <BrandingProvider>

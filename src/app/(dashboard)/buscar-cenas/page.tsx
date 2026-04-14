@@ -201,13 +201,13 @@ export default function BuscarCenasPage() {
                {/* BARRA DE BUSCA PRINCIPAL */}
                <form onSubmit={(e) => handleSearch(e)} className="flex flex-col sm:flex-row gap-3 max-w-2xl mx-auto w-full">
                   <div className="flex-1 relative">
-                    <Input
-                      ref={searchInputRef}
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      placeholder="Busque cenas épicas..."
-                      className="w-full h-20 rounded-2xl text-lg px-8 bg-[#0a0a0a] border border-white/10 shadow-2xl text-white placeholder:text-gray-600 focus:ring-2 focus:ring-blue-500/40 transition-all font-bold"
-                    />
+                     <Input
+                       ref={searchInputRef}
+                       value={query}
+                       onChange={(e) => setQuery(e.target.value)}
+                       placeholder="Busque cenas épicas..."
+                       className="w-full h-16 md:h-20 rounded-2xl text-lg px-8 bg-white dark:bg-[#0a0a0a] border border-black/5 dark:border-white/10 shadow-2xl text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:ring-2 focus:ring-blue-500/40 transition-all font-bold"
+                     />
                     {query && (
                       <button 
                         type="button"
@@ -216,13 +216,13 @@ export default function BuscarCenasPage() {
                       >✕</button>
                     )}
                   </div>
-                  <Button 
-                    type="submit" 
-                    disabled={loading || !query.trim()}
-                    className="h-20 px-12 rounded-2xl bg-white hover:bg-gray-100 text-black font-black text-lg transition-all active:scale-95 disabled:opacity-50 shadow-2xl"
-                  >
-                    {loading ? "BUSCANDO..." : "BUSCAR 🔥"}
-                  </Button>
+                   <Button 
+                     type="submit" 
+                     disabled={loading || !query.trim()}
+                     className="h-16 md:h-20 px-12 rounded-2xl bg-gray-900 dark:bg-white hover:bg-black dark:hover:bg-gray-100 text-white dark:text-black font-black text-lg transition-all active:scale-95 disabled:opacity-50 shadow-2xl shrink-0"
+                   >
+                     {loading ? "BUSCANDO..." : "BUSCAR 🔥"}
+                   </Button>
                </form>
 
                {/* BOTÃƒO DE GERAÃ‡ÃƒO MÃGICA AI */}
@@ -261,9 +261,9 @@ export default function BuscarCenasPage() {
       {/* RESULTADOS */}
       {(loading || results.length > 0) && (
         <div className="space-y-12 animate-in fade-in slide-in-from-bottom-5 duration-700">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-white/5 pb-8">
-             <div className="space-y-2">
-                <h2 className="text-3xl font-black text-white tracking-tighter uppercase italic">Cenas Filtradas</h2>
+           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-gray-100 dark:border-white/5 pb-8">
+              <div className="space-y-2">
+                 <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter uppercase italic">Cenas Filtradas</h2>
                 <div className="flex items-center gap-4">
                   <span className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">{results.length} EXIBIDAS</span>
                   <div className="w-1 h-1 rounded-full bg-gray-800"></div>
@@ -333,11 +333,11 @@ export default function BuscarCenasPage() {
       )}
 
       {!loading && results.length === 0 && !error && (
-         <div className="py-40 text-center flex flex-col items-center select-none animate-in fade-in duration-1000">
-            <div className="w-28 h-28 bg-white/5 rounded-[2.5rem] items-center justify-center flex text-4xl mb-8 border border-white/5 shadow-inner">🔍</div>
-            <h3 className="text-4xl font-black text-white tracking-widest uppercase italic">Inicie sua busca</h3>
-            <p className="text-gray-500 font-bold text-sm max-w-xs mt-6 uppercase tracking-widest leading-relaxed opacity-60">Encontre visuais que <br/> definem a próxima tendência viral.</p>
-         </div>
+          <div className="py-40 text-center flex flex-col items-center select-none animate-in fade-in duration-1000">
+             <div className="w-28 h-28 bg-gray-100 dark:bg-white/5 rounded-[2.5rem] items-center justify-center flex text-4xl mb-8 border border-gray-200 dark:border-white/5 shadow-inner">🔍</div>
+             <h3 className="text-4xl font-black text-gray-900 dark:text-white tracking-widest uppercase italic">Inicie sua busca</h3>
+             <p className="text-gray-500 font-bold text-sm max-w-xs mt-6 uppercase tracking-widest leading-relaxed opacity-60">Encontre visuais que <br/> definem a próxima tendência viral.</p>
+          </div>
       )}
     </div>
   );

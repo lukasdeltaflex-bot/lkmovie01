@@ -199,7 +199,7 @@ export default function BibliotecaPage() {
       {currentList.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
            {currentList.map(project => (
-             <div key={project.id} className="group bg-[#0d0d0d] rounded-2xl border border-white/5 overflow-hidden shadow-2xl transition-all hover:scale-[1.03] duration-500 relative flex flex-col h-full">
+             <div key={project.id} className="group bg-white dark:bg-[#0d0d0d] rounded-2xl border border-gray-100 dark:border-white/5 overflow-hidden shadow-xl dark:shadow-2xl transition-all hover:scale-[1.03] duration-500 relative flex flex-col h-full">
                 <div className="aspect-video relative bg-black overflow-hidden group-hover:scale-105 transition-all duration-700">
                    <img src={project.thumbnail} alt={project.title} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all bg-black/40 backdrop-blur-sm cursor-pointer" onClick={() => view === 'active' && handleOpenProject(project)}>
@@ -212,19 +212,19 @@ export default function BibliotecaPage() {
                        <div className="flex items-start justify-between gap-4">
                           <div className="overflow-hidden">
                             <p className="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-1 truncate opacity-70 italic">{project.channelTitle}</p>
-                            <h3 className="text-lg font-black text-white leading-tight line-clamp-2 uppercase tracking-tighter">{project.title}</h3>
+                            <h3 className="text-lg font-black text-gray-900 dark:text-white leading-tight line-clamp-2 uppercase tracking-tighter">{project.title}</h3>
                           </div>
                           {view === "active" && getDownloadButton(project.id!)}
                        </div>
                        {view === "active" && getRenderStatus(project.id!)}
                     </div>
 
-                    <div className="pt-6 border-t border-white/5 flex items-center justify-between gap-2">
+                    <div className="pt-6 border-t border-gray-100 dark:border-white/5 flex items-center justify-between gap-2">
                        {view === "active" ? (
                          <>
                            <Button variant="ghost" onClick={() => handleDuplicate(project.id!)} className="flex-1 h-10 text-[8px] font-black uppercase text-gray-500 hover:text-blue-500 transition-colors">Copiar</Button>
                            <Button variant="ghost" onClick={() => handleDelete(project.id!)} className="flex-1 h-10 text-[8px] font-black uppercase text-gray-500 hover:text-red-500 transition-colors">Excluir</Button>
-                           <Button onClick={() => handleOpenProject(project)} className="flex-1 h-10 text-[8px] font-black uppercase bg-white text-black rounded-lg hover:bg-gray-200 shadow-xl">ABRIR</Button>
+                           <Button onClick={() => handleOpenProject(project)} className="flex-1 h-10 text-[8px] font-black uppercase bg-gray-900 dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 shadow-xl">ABRIR</Button>
                          </>
                        ) : (
                          <>

@@ -74,8 +74,8 @@ export default function DashboardPage() {
              <span className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_10px_#3b82f6]"></span>
              Intelligence Hub {plan.toUpperCase()}
           </div>
-          <h1 className="text-5xl md:text-7xl font-black text-white tracking-tighter leading-none">
-            Welcome, <span className="bg-clip-text text-transparent italic bg-gradient-to-r from-blue-400 to-indigo-500">{userName}</span>
+          <h1 className="text-5xl md:text-7xl font-black text-gray-900 dark:text-white tracking-tighter leading-none">
+            Welcome, <span className="bg-clip-text text-transparent italic bg-gradient-to-r from-blue-600 to-indigo-500">{userName}</span>
           </h1>
         </div>
 
@@ -89,7 +89,7 @@ export default function DashboardPage() {
               <Button onClick={copyReferral} variant="outline" className="h-12 px-6 rounded-2xl border-white/10 text-[9px] font-black uppercase">Indicador PRO 🚀</Button>
            </div>
            
-           <Button onClick={() => setShowAutoModal(true)} className="h-20 px-10 rounded-3xl bg-blue-600 font-black italic shadow-2xl">GERAÇÃO MÁGICA 🪄</Button>
+           <Button onClick={() => setShowAutoModal(true)} className="h-20 px-10 rounded-3xl bg-blue-600 text-white font-black italic shadow-2xl hover:scale-105 active:scale-95 transition-all">GERAÇÃO MÁGICA 🪄</Button>
         </div>
       </header>
 
@@ -106,14 +106,14 @@ export default function DashboardPage() {
 
         <div className="lg:col-span-4 space-y-8">
            {/* USAGE LIMITS */}
-           <div className="bg-[#0a0a0a] rounded-3xl border border-white/5 p-10 shadow-2xl space-y-8">
-              <h3 className="text-xl font-black text-white tracking-tighter uppercase italic">SaaS Power Metrics</h3>
+           <div className="bg-white dark:bg-[#0a0a0a] rounded-3xl border border-gray-100 dark:border-white/5 p-10 shadow-xl dark:shadow-2xl space-y-8">
+              <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tighter uppercase italic">SaaS Power Metrics</h3>
               <div className="space-y-6">
                  <UsageBar label="Buscas (24h)" current={usage.searchesCount} max={limits.maxDailySearches} color="#3b82f6" />
                  <UsageBar label="Projetos" current={usage.projectsCount} max={limits.maxProjects} color="#8b5cf6" />
                  <UsageBar label="Renderizações" current={usage.rendersCount} max={limits.maxRenders} color="#10b981" />
               </div>
-              <Link href="/perfil" className="block"><Button className="w-full h-14 rounded-2xl border-white/5 bg-white/5 text-gray-400 hover:text-white font-black text-[10px] uppercase transition-all">Gerenciar Plano 💎</Button></Link>
+              <Link href="/perfil" className="block"><Button className="w-full h-14 rounded-2xl border border-gray-100 dark:border-white/5 bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white font-black text-[10px] uppercase transition-all">Gerenciar Plano 💎</Button></Link>
            </div>
 
            <ActivityLog />
@@ -166,16 +166,16 @@ function UsageBar({ label, current, max, color }: any) {
 
 function MetricCard({ title, value, icon, badge, color, trend }: any) {
   return (
-    <div className="bg-[#0d0d0d] border border-white/5 p-8 rounded-3xl flex flex-col justify-between group h-60 hover:scale-[1.03] transition-all relative overflow-hidden shadow-2xl">
+    <div className="bg-white dark:bg-[#0d0d0d] border border-gray-100 dark:border-white/5 p-8 rounded-3xl flex flex-col justify-between group h-60 hover:scale-[1.03] transition-all relative overflow-hidden shadow-xl dark:shadow-2xl">
        <div className="flex justify-between items-start relative z-10">
           <div>
-             <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] italic">{title}</p>
-             <p className="text-[11px] font-black text-blue-500 mt-2 uppercase tracking-widest">{trend}</p>
+             <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] italic">{title}</p>
+             <p className="text-[11px] font-black text-blue-600 dark:text-blue-500 mt-2 uppercase tracking-widest">{trend}</p>
           </div>
-          <span className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center text-2xl shadow-inner border border-white/5" style={{ color }}>{icon}</span>
+          <span className="w-14 h-14 bg-gray-50 dark:bg-white/5 rounded-2xl flex items-center justify-center text-2xl shadow-inner border border-gray-100 dark:border-white/5" style={{ color }}>{icon}</span>
        </div>
        <div className="relative z-10">
-          <p className="text-6xl font-black text-white items-baseline flex gap-4 tracking-tighter leading-none">{value} <span className="text-[11px] uppercase font-black text-gray-500 bg-white/5 px-3 py-1.5 rounded-full border border-white/5">{badge}</span></p>
+          <p className="text-6xl font-black text-gray-900 dark:text-white items-baseline flex gap-4 tracking-tighter leading-none">{value} <span className="text-[11px] uppercase font-black text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-white/5 px-3 py-1.5 rounded-full border border-gray-100 dark:border-white/5">{badge}</span></p>
        </div>
        <div className="absolute -right-6 -bottom-6 w-32 h-32 opacity-10 border-[15px] border-current rounded-full blur-2xl" style={{ color }}></div>
     </div>
