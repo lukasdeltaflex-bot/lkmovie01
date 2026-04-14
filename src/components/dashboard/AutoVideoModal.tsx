@@ -121,8 +121,8 @@ export function AutoVideoModal({ onClose }: AutoVideoModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/90 backdrop-blur-2xl z-100 flex items-center justify-center p-6 animate-in fade-in duration-300">
-      <div className="bg-[#0a0a0a] border border-white/5 rounded-[3rem] w-full max-w-2xl overflow-hidden shadow-[0_0_100px_rgba(37,99,235,0.2)] flex flex-col">
+    <div className="fixed inset-0 bg-black/90 backdrop-blur-2xl z-[100] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300 overflow-y-auto">
+      <div className="bg-[#0a0a0a] border border-white/5 rounded-3xl w-full max-w-2xl shadow-[0_0_100px_rgba(37,99,235,0.2)] flex flex-col my-auto">
         
         {/* MODAL HEADER */}
         <div className="p-10 border-b border-white/5 flex justify-between items-center bg-gradient-to-r from-blue-600/10 to-transparent">
@@ -137,7 +137,7 @@ export function AutoVideoModal({ onClose }: AutoVideoModalProps) {
         </div>
 
         {/* MODAL CONTENT */}
-        <div className="flex-1 p-10 space-y-10">
+        <div className="flex-1 p-6 sm:p-10 space-y-8 overflow-y-auto">
            {isGenerating ? (
               <div className="text-center space-y-12 py-20 flex flex-col items-center justify-center h-full">
                  <div className="relative">
@@ -207,7 +207,7 @@ export function AutoVideoModal({ onClose }: AutoVideoModalProps) {
               <Button 
                 onClick={handleGenerate} 
                 disabled={!idea.trim()} 
-                className="w-full h-24 rounded-[2.5rem] font-black text-xs uppercase tracking-[0.4em] bg-blue-600 hover:bg-blue-500 shadow-2xl shadow-blue-600/30 hover:scale-[1.02] active:scale-95 transition-all"
+                className="w-full h-16 sm:h-20 rounded-2xl sm:rounded-[2.5rem] font-black text-xs uppercase tracking-[0.4em] bg-blue-600 hover:bg-blue-500 shadow-2xl shadow-blue-600/30 hover:scale-[1.02] active:scale-95 transition-all"
               >
                 MONTAR VÍDEO VIRAL AGORA 🚀
               </Button>

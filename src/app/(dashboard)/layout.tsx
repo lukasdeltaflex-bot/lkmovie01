@@ -45,10 +45,10 @@ export default function DashboardLayout({
 
   return (
     <SelectedVideoProvider>
-      <div className="flex h-screen bg-background text-foreground transition-colors duration-300 overflow-hidden font-sans">
+      <div className="flex h-screen bg-background text-foreground transition-colors duration-300 font-sans overflow-hidden">
         <Sidebar />
         <main 
-          className={`flex-1 overflow-y-auto px-4 py-8 md:px-8 lg:px-12 md:py-10 transition-all duration-500 w-full relative ${
+          className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 py-8 md:px-8 lg:px-12 md:py-10 transition-all duration-500 w-0 relative ${
             sidebarCollapsed ? "md:ml-20" : "md:ml-72"
           }`}
         >
@@ -66,7 +66,7 @@ export default function DashboardLayout({
              </div>
           </div>
 
-          <div className="max-w-[1400px] mx-auto w-full">
+          <div className="max-w-[1400px] mx-auto w-full min-w-0">
             {children}
           </div>
         </main>

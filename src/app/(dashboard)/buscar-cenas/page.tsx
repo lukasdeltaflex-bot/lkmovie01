@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/Button";
@@ -179,19 +179,19 @@ export default function BuscarCenasPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20 px-4">
+    <div className="w-full min-w-0 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
       {showAutoModal && <AutoVideoModal onClose={() => setShowAutoModal(false)} />}
       
       {/* HEADER BUSCA */}
       <div 
-        className="rounded-[3rem] p-8 md:p-16 text-center shadow-2xl relative overflow-hidden backdrop-blur-3xl border border-white/5"
+        className="rounded-3xl p-6 md:p-10 text-center shadow-2xl relative overflow-hidden backdrop-blur-3xl border border-white/5"
         style={{ background: `linear-gradient(135deg, ${branding.primaryColor} 0%, ${branding.secondaryColor} 100%)` }}
       >
-         <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-white/10 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2"></div>
+         <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-white/10 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
          
-         <div className="relative z-10 space-y-10 max-w-4xl mx-auto">
-            <div className="space-y-4">
-               <h1 className="text-4xl md:text-7xl font-black text-white tracking-tighter drop-shadow-2xl leading-[0.9]">
+         <div className="relative z-10 space-y-6 max-w-3xl mx-auto">
+            <div className="space-y-3">
+               <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tighter drop-shadow-2xl leading-tight">
                   BUSQUE OU <span className="text-black/20 italic">GERAR VIRAL AI</span>
                </h1>
                <p className="text-white/60 font-black text-xs uppercase tracking-[0.3em] italic">Acesse o maior banco de cenas cinematográficas do mundo</p>
@@ -199,33 +199,33 @@ export default function BuscarCenasPage() {
             
             <div className="flex flex-col gap-6 pt-4">
                {/* BARRA DE BUSCA PRINCIPAL */}
-               <form onSubmit={(e) => handleSearch(e)} className="flex flex-col sm:flex-row gap-3 max-w-2xl mx-auto w-full">
-                  <div className="flex-1 relative">
-                     <Input
-                       ref={searchInputRef}
-                       value={query}
-                       onChange={(e) => setQuery(e.target.value)}
-                       placeholder="Busque cenas épicas..."
-                       className="w-full h-16 md:h-20 rounded-2xl text-lg px-8 bg-white dark:bg-[#0f0f0f] border border-gray-300 dark:border-white/10 shadow-2xl text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500 transition-all font-bold"
-                     />
-                    {query && (
-                      <button 
-                        type="button"
-                        onClick={handleClear}
-                        className="absolute right-6 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-400 hover:text-gray-600 rounded-full transition-all"
-                      >✕</button>
-                    )}
-                  </div>
-                   <Button 
-                     type="submit" 
-                     disabled={loading || !query.trim()}
-                     className="h-16 md:h-20 px-12 rounded-2xl bg-gray-900 dark:bg-white hover:bg-black dark:hover:bg-gray-100 text-white dark:text-black font-black text-lg transition-all active:scale-95 disabled:opacity-50 shadow-2xl shrink-0"
-                   >
-                     {loading ? "BUSCANDO..." : "BUSCAR 🔥"}
-                   </Button>
+               <form onSubmit={(e) => handleSearch(e)} className="flex flex-col sm:flex-row gap-3 w-full max-w-2xl mx-auto">
+                   <div className="flex-1 relative min-w-0">
+                      <Input
+                        ref={searchInputRef}
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Busque cenas épicas..."
+                        className="w-full h-14 md:h-16 rounded-2xl text-base px-6 bg-white dark:bg-[#0f0f0f] border border-gray-300 dark:border-white/10 shadow-2xl text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500 transition-all font-bold"
+                      />
+                     {query && (
+                       <button 
+                         type="button"
+                         onClick={handleClear}
+                         className="absolute right-4 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-400 hover:text-gray-600 rounded-full transition-all"
+                       >✕</button>
+                     )}
+                   </div>
+                    <Button 
+                      type="submit" 
+                      disabled={loading || !query.trim()}
+                      className="h-14 md:h-16 px-8 rounded-2xl bg-gray-900 dark:bg-white hover:bg-black dark:hover:bg-gray-100 text-white dark:text-black font-black text-base transition-all active:scale-95 disabled:opacity-50 shadow-2xl shrink-0"
+                    >
+                      {loading ? "BUSCANDO..." : "BUSCAR 🔥"}
+                    </Button>
                </form>
 
-               {/* BOTÃƒO DE GERAÃ‡ÃƒO MÃGICA AI */}
+               {/* BOTÃO DE GERAÇÃO MÁGICA AI */}
                <div className="flex justify-center">
                   <button 
                      onClick={() => setShowAutoModal(true)}
