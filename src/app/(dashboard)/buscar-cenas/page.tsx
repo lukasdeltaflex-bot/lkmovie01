@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/Button";
@@ -206,7 +206,7 @@ export default function BuscarCenasPage() {
                        value={query}
                        onChange={(e) => setQuery(e.target.value)}
                        placeholder="Busque cenas épicas..."
-                       className="w-full h-16 md:h-20 rounded-2xl text-lg px-8 bg-background border border-border-custom shadow-2xl text-foreground placeholder:text-muted-custom focus:ring-2 focus:ring-blue-500/40 transition-all font-bold"
+                       className="w-full h-16 md:h-20 rounded-2xl text-lg px-8 bg-white dark:bg-[#0f0f0f] border border-gray-300 dark:border-white/10 shadow-2xl text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500 transition-all font-bold"
                      />
                     {query && (
                       <button 
