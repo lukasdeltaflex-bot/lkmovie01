@@ -1,5 +1,5 @@
 export type Platform = "tiktok" | "reels" | "shorts" | "youtube";
-export type ViralTemplate = "motivacional" | "triste" | "impacto" | "reflexivo" | "cinematográfico";
+export type ViralTemplate = "motivacional" | "triste" | "impacto" | "reflexivo" | "cinematográfico" | "curiosidade";
 
 export interface AutoProjectFlavor {
   query: string;
