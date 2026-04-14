@@ -1,3 +1,5 @@
+"use client";
+ 
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/context/auth-context";
 import { useBranding } from "@/context/branding-context";
