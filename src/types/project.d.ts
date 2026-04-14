@@ -26,11 +26,13 @@ export interface SavedProject {
   
   // Global / Legacy Subtitles (Backward Compatibility)
   subtitleText: string;
+  subtitleTextEn?: string;
   subtitleColor: string;
   subtitleSize: number;
   subtitlePosition: string;
   subtitleType: "none" | "pt" | "en" | "both";
   subtitleFont: string;
+  subtitlePreset?: string;
   isAutoSubtitle: boolean;
   
   // Watermark

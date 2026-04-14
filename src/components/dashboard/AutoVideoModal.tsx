@@ -9,11 +9,6 @@ import { generateAutoProject, Platform, ViralTemplate } from "@/lib/ai/auto-gene
 import { createProject } from "@/lib/firebase/projects";
 import { canPerformAction } from "@/lib/utils/usage-limits";
 import { incrementUserStat } from "@/lib/firebase/user-settings";
-import { createRenderJob, RenderStatus } from "@/lib/firebase/render-jobs";
-import { createNotification } from "@/lib/firebase/notifications";
-import { doc, onSnapshot } from "firebase/firestore";
-import { db } from "@/lib/firebase/config";
-import axios from "axios";
 
 interface AutoVideoModalProps {
   onClose: () => void;
@@ -31,7 +26,8 @@ const TEMPLATES: {id: ViralTemplate, label: string, icon: string, color: string}
   { id: "triste", label: "Emocional", icon: "💔", color: "indigo" },
   { id: "impacto", label: "Impacto", icon: "🌋", color: "amber" },
   { id: "reflexivo", label: "Reflexão", icon: "✨", color: "emerald" },
-  { id: "cinematográfico", label: "Cine", icon: "💎", color: "violet" }
+  { id: "cinematográfico", label: "Cine", icon: "💎", color: "violet" },
+  { id: "curiosidade", label: "Curioso", icon: "🧐", color: "amber" }
 ];
 
 export function AutoVideoModal({ onClose }: AutoVideoModalProps) {
@@ -45,87 +41,62 @@ export function AutoVideoModal({ onClose }: AutoVideoModalProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState<string|null>(null);
-  const [jobId, setJobId] = useState<string | null>(null);
-  const [progress, setProgress] = useState(0);
-  const [renderStatus, setRenderStatus] = useState<RenderStatus>("pending");
-  const [outputUrl, setOutputUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!jobId || !db || !user) return;
-    const docRef = doc(db, "renderJobs", jobId);
-    const unsubscribe = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setProgress(data.progress || 0);
-        setRenderStatus(data.status);
-        if (data.status === "completed" && data.outputUrl) {
-          setOutputUrl(data.outputUrl);
-          setStatus("Vídeo Viral Pronto! 🚀");
-          if (showToast) showToast("Renderização Concluída!", "success");
-          
-          // Phase 11: Notificação de sistema
-          createNotification(user.uid, {
-            title: "Renderização Concluída",
-            message: "Seu vídeo viral já está pronto para download.",
-            type: "success"
-          });
-        }
-        if (data.status === "failed") {
-          setError(data.errorMessage || "Falha técnica no motor viral.");
-          setIsGenerating(false);
-        }
-      }
-    });
-    return () => unsubscribe();
-  }, [jobId, user, showToast]);
-
-  const handleShare = () => {
-    if (!jobId) return;
-    const url = `${window.location.origin}/video/${jobId}`;
-    if (navigator.share) {
-      navigator.share({ title: "Meu Vídeo Viral", url });
-    } else {
-      navigator.clipboard.writeText(url);
-      if (showToast) showToast("Link de compartilhamento copiado! 🔗", "success");
-    }
-  };
 
   const handleGenerate = async () => {
     if (!user || !idea.trim()) return;
+    
+    // SaaS Protection
     const limitCheck = canPerformAction(branding as any, "project");
     if (!limitCheck.allowed) {
       setError(limitCheck.message || "Limite de conta atingido.");
       return;
     }
+
     setIsGenerating(true);
     setError(null);
-    setStatus("IA Viral Hub inicializando...");
+    setStatus("Estudando sua ideia com IA...");
 
     try {
+      // 1. Geração Inteligente de Parâmetros
       const config = generateAutoProject(idea, platform, template);
-      setStatus(`Buscando visual para ${template.toUpperCase()}...`);
+      
+      // 2. Busca Automática do Melhor Clip
+      setStatus("Buscando cenas cinematográficas...");
       const searchRes = await fetch(`/api/search?q=${encodeURIComponent(config.query)}`);
       const videos = await searchRes.json();
-      if (!videos || videos.length === 0) throw new Error("Cenas não encontradas.");
-      const bestVideo = videos[0];
       
+      if (!videos || videos.length === 0) {
+         throw new Error("Não encontramos cenas ideais para este tema. Tente outra ideia!");
+      }
+
+      const bestVideo = videos[0];
+      setStatus("Sintonizando estética viral...");
+      await new Promise(r => setTimeout(r, 1200)); // Simulando inteligência
+
+      setStatus("Configurando legendas dinâmicas...");
+      await new Promise(r => setTimeout(r, 800));
+
+      // 3. Criação do Projeto no Firestore
+      setStatus("Finalizando sua obra-prima...");
       const projectId = await createProject({
         userId: user.uid,
-        title: `Viral: ${idea.slice(0, 20)}`,
+        title: `AI Viral: ${idea.slice(0, 30)}...`,
         videoId: bestVideo.id,
         thumbnail: bestVideo.thumbnail,
         channelTitle: bestVideo.channelTitle,
         aspectRatio: platform === "youtube" ? "16:9" : "9:16",
         subtitleText: config.caption,
+        subtitleTextEn: config.captionEn,
         subtitleColor: config.style.color,
         subtitleSize: config.style.size,
         subtitlePosition: config.style.position as any,
-        subtitleType: "pt", // Padrão para auto-gerado
-        subtitleFont: "Inter",
+        subtitleType: "both", // Padrão Pro: Dual Language
+        subtitleFont: "Montserrat",
+        subtitlePreset: config.editorPreset,
         isAutoSubtitle: true,
         watermarkUrl: branding.defaultWatermark || "",
         watermarkOpacity: 60,
-        watermarkPosition: platform === "youtube" ? "bottom-right" : "bottom-left",
+        watermarkPosition: "bottom-right",
         watermarkScale: 0.15,
         endScreenUrl: branding.defaultEndScreen || "",
         audioMode: config.audio.mix,
@@ -133,90 +104,116 @@ export function AutoVideoModal({ onClose }: AutoVideoModalProps) {
         volumeMusic: config.audio.volumeMusic || 0.6,
       });
 
+      setStatus("Projeto pronto! Redirecionando...");
+      if (showToast) showToast("Vídeo Viral Gerado com Sucesso! ✨", "success");
+      
+      // 4. Analytics
+      await incrementUserStat(user.uid, "usage.aiGenerations");
 
+      // 5. Redirecionamento
+      router.push(`/editor?id=${projectId}`);
+      onClose();
 
-      const renderJobId = await createRenderJob(user.uid, projectId);
-      setJobId(renderJobId);
-
-      await axios.post("/api/render-video", {
-        renderJobId, userId: user.uid, projectId, videoUrl: bestVideo.thumbnail,
-        subtitleText: config.caption, subtitleColor: config.style.color,
-        subtitleSize: config.style.size, subtitlePosition: config.style.position,
-        volumeVideo: 1, volumeMusic: config.audio.volumeMusic || 0.6,
-        muteOriginal: config.audio.mix === "remove", outputAspectRatio: platform === "youtube" ? "16:9" : "9:16",
-        watermarkUrl: branding.defaultWatermark || "", watermarkOpacity: 0.6,
-        watermarkPosition: platform === "youtube" ? "bottom-right" : "bottom-left", watermarkScale: 0.15,
-      });
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Erro fatal no Motor Viral. Tente novamente.");
       setIsGenerating(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-3xl z-100 flex items-center justify-center p-6 animate-in fade-in">
-      <div className="bg-white dark:bg-gray-950 border border-gray-100 dark:border-gray-800 rounded-[3.5rem] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col min-h-[600px]">
-        <div className="p-10 border-b border-gray-100 dark:border-gray-800 flex justify-between bg-black/50">
-           <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-blue-500 text-white flex items-center justify-center text-2xl shadow-lg">⚡</div>
-              <h2 className="text-2xl font-black text-white uppercase italic">Viral Hub</h2>
-           </div>
-           <button onClick={onClose} disabled={isGenerating} className="text-xl text-gray-400 hover:text-white">✕</button>
-        </div>
-        <div className="flex-1 p-10 overflow-y-auto space-y-10">
-           {renderStatus === 'completed' ? (
-              <div className="text-center space-y-8 flex flex-col items-center justify-center h-full">
-                 <div className="text-6xl animate-bounce">🎬</div>
-                 <h3 className="text-3xl font-black text-white">VÍDEO VIRAL PRONTO!</h3>
-                 <div className="flex flex-col gap-4 w-full max-w-xs">
-                    <a href={outputUrl!} target="_blank" download className="w-full">
-                       <Button className="w-full h-20 rounded-3xl font-black bg-green-500 hover:scale-105 transition-transform">DOWNLOAD MP4 💎</Button>
-                    </a>
-                    <Button onClick={handleShare} variant="outline" className="h-16 rounded-3xl font-black uppercase tracking-widest border-gray-800 text-gray-400">COMPARTILHAR 🔗</Button>
-                    <Button onClick={() => router.push("/biblioteca")} variant="ghost" className="text-xs font-black uppercase text-gray-500">Ver na Galeria ➔</Button>
-                 </div>
+    <div className="fixed inset-0 bg-black/90 backdrop-blur-2xl z-100 flex items-center justify-center p-6 animate-in fade-in duration-300">
+      <div className="bg-[#0a0a0a] border border-white/5 rounded-[3rem] w-full max-w-2xl overflow-hidden shadow-[0_0_100px_rgba(37,99,235,0.2)] flex flex-col">
+        
+        {/* MODAL HEADER */}
+        <div className="p-10 border-b border-white/5 flex justify-between items-center bg-gradient-to-r from-blue-600/10 to-transparent">
+           <div className="flex items-center gap-5">
+              <div className="w-14 h-14 rounded-2xl bg-blue-600 text-white flex items-center justify-center text-3xl shadow-[0_0_20px_rgba(37,99,235,0.5)] animate-pulse">🪄</div>
+              <div>
+                <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter leading-none">Gerador Viral AI</h2>
+                <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mt-1">Transforme ideias em produções de elite</p>
               </div>
-           ) : isGenerating ? (
-              <div className="text-center space-y-8 py-20 flex flex-col items-center">
-                 <div className="animate-spin w-20 h-20 border-8 border-t-white border-white/10 rounded-full"></div>
-                 <p className="text-sm font-black uppercase tracking-widest text-blue-500 animate-pulse">{status}</p>
-                 <div className="w-full h-2 bg-black rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-500 transition-all duration-700" style={{ width: `${progress}%` }}></div>
+           </div>
+           {!isGenerating && <button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/5 transition-colors text-gray-500 hover:text-white">✕</button>}
+        </div>
+
+        {/* MODAL CONTENT */}
+        <div className="flex-1 p-10 space-y-10">
+           {isGenerating ? (
+              <div className="text-center space-y-12 py-20 flex flex-col items-center justify-center h-full">
+                 <div className="relative">
+                    <div className="w-24 h-24 border-8 border-blue-600/10 border-t-blue-600 animate-spin rounded-full shadow-2xl"></div>
+                    <div className="absolute inset-0 flex items-center justify-center text-3xl">🚀</div>
+                 </div>
+                 <div className="space-y-4">
+                    <p className="text-sm font-black uppercase tracking-[0.4em] text-blue-500 animate-pulse">{status}</p>
+                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest max-w-xs mx-auto leading-relaxed opacity-60 italic">Nossos satélites estão localizando os melhores visuais para sua ideia...</p>
                  </div>
               </div>
            ) : (
-              <div className="space-y-10">
+              <div className="space-y-10 animate-in slide-in-from-bottom-5">
                  <div className="grid md:grid-cols-2 gap-8">
                     <div className="space-y-4">
-                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Plataforma</label>
+                       <label className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] italic">Destino Final</label>
                        <div className="grid grid-cols-2 gap-2">
                           {PLATFORMS.map(p => (
-                             <button key={p.id} onClick={() => setPlatform(p.id)} className={`p-4 rounded-xl border-2 text-[10px] uppercase font-black transition-all ${platform === p.id ? 'border-blue-500 bg-blue-500/5' : 'border-gray-800 opacity-60'}`}>{p.icon} {p.label}</button>
+                             <button 
+                                key={p.id} 
+                                onClick={() => setPlatform(p.id)} 
+                                className={`h-14 rounded-2xl border-2 text-[10px] uppercase font-black transition-all flex items-center justify-center gap-2 ${platform === p.id ? 'border-blue-500 bg-blue-500/10 text-blue-400 shadow-lg shadow-blue-500/10' : 'border-white/5 bg-white/5 text-gray-600 hover:border-white/10'}`}
+                             >
+                                <span className="text-lg">{p.icon}</span> {p.label.split(' ')[0]}
+                             </button>
                           ))}
                        </div>
                     </div>
                     <div className="space-y-4">
-                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Template</label>
-                       <div className="grid grid-cols-1 gap-2">
+                       <label className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] italic">Estética Viral</label>
+                       <div className="flex flex-wrap gap-2">
                           {TEMPLATES.map(t => (
-                             <button key={t.id} onClick={() => setTemplate(t.id)} className={`p-3 rounded-xl border-2 text-[10px] uppercase font-black text-left transition-all ${template === t.id ? 'border-indigo-500 bg-indigo-500/5' : 'border-gray-800 opacity-60'}`}>{t.icon} {t.label}</button>
+                             <button 
+                                key={t.id} 
+                                onClick={() => setTemplate(t.id as any)} 
+                                className={`px-4 h-11 rounded-xl border-2 text-[9px] uppercase font-black transition-all flex items-center gap-2 ${template === t.id ? 'border-indigo-500 bg-indigo-500/10 text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.2)]' : 'border-white/5 bg-white/5 text-gray-600 hover:border-white/10'}`}
+                             >
+                                <span>{t.icon}</span> {t.label}
+                             </button>
                           ))}
                        </div>
                     </div>
                  </div>
-                 <textarea 
-                   placeholder="Sua ideia viral..."
-                   className="w-full h-32 bg-black rounded-[2rem] p-8 border border-gray-800 text-white font-bold"
-                   value={idea}
-                   onChange={e => setIdea(e.target.value)}
-                 />
+
+                 <div className="space-y-4">
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] italic">Qual o conceito da cena?</label>
+                    <textarea 
+                      placeholder="Ex: Frase motivacional sobre resiliência na academia..."
+                      className="w-full h-40 bg-white/5 rounded-[2rem] p-8 border border-white/5 text-white font-bold placeholder:text-gray-700 outline-none focus:border-blue-500/50 transition-all resize-none shadow-inner"
+                      value={idea}
+                      onChange={e => setIdea(e.target.value)}
+                    />
+                 </div>
               </div>
            )}
-           {error && <div className="p-6 bg-red-500/10 text-red-500 rounded-2xl text-[10px] font-black uppercase text-center">{error}</div>}
+
+           {error && (
+              <div className="p-6 bg-red-600/10 border border-red-600/20 text-red-500 rounded-2xl text-[10px] font-black uppercase text-center tracking-widest italic animate-in shake duration-500">
+                 🚨 {error}
+              </div>
+           )}
         </div>
-        {!isGenerating && renderStatus !== 'completed' && (
-           <div className="p-10 border-t border-gray-800">
-              <Button onClick={handleGenerate} disabled={!idea.trim()} className="w-full h-20 rounded-[2rem] font-black text-xl bg-blue-600 hover:scale-[1.02]">GERAR AGORA 🚀</Button>
+
+        {/* MODAL FOOTER */}
+        {!isGenerating && (
+           <div className="p-10 border-t border-white/5 bg-black/50">
+              <Button 
+                onClick={handleGenerate} 
+                disabled={!idea.trim()} 
+                className="w-full h-24 rounded-[2.5rem] font-black text-xs uppercase tracking-[0.4em] bg-blue-600 hover:bg-blue-500 shadow-2xl shadow-blue-600/30 hover:scale-[1.02] active:scale-95 transition-all"
+              >
+                MONTAR VÍDEO VIRAL AGORA 🚀
+              </Button>
+              <p className="text-center text-[9px] font-black text-gray-600 uppercase tracking-widest mt-6 opacity-40 italic">
+                 A IA selecionará a cena, criará as legendas e aplicará o estilo perfeito.
+              </p>
            </div>
         )}
       </div>
