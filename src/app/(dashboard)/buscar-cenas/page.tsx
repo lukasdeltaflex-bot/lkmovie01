@@ -206,7 +206,7 @@ export default function BuscarCenasPage() {
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
                       placeholder="Busque cenas épicas..."
-                      className="w-full h-20 rounded-3xl text-lg px-8 bg-white border-none shadow-2xl text-gray-900 placeholder:text-gray-400 focus:ring-4 focus:ring-white/30 transition-all font-bold"
+                      className="w-full h-20 rounded-2xl text-lg px-8 bg-[#0a0a0a] border border-white/10 shadow-2xl text-white placeholder:text-gray-600 focus:ring-2 focus:ring-blue-500/40 transition-all font-bold"
                     />
                     {query && (
                       <button 
@@ -219,7 +219,7 @@ export default function BuscarCenasPage() {
                   <Button 
                     type="submit" 
                     disabled={loading || !query.trim()}
-                    className="h-20 px-12 rounded-3xl bg-black hover:bg-gray-900 text-white font-black text-lg transition-all active:scale-95 disabled:opacity-50 shadow-2xl"
+                    className="h-20 px-12 rounded-2xl bg-white hover:bg-gray-100 text-black font-black text-lg transition-all active:scale-95 disabled:opacity-50 shadow-2xl"
                   >
                     {loading ? "BUSCANDO..." : "BUSCAR 🔥"}
                   </Button>
@@ -288,10 +288,10 @@ export default function BuscarCenasPage() {
                 return (
                   <div 
                     key={video.id} 
-                    className="group bg-[#0d0d0d] border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl hover:border-blue-500/50 transition-all flex flex-col cursor-pointer transform hover:-translate-y-2 duration-500 relative"
+                    className="group bg-[#0d0d0d] border border-white/5 rounded-2xl overflow-hidden shadow-2xl hover:border-blue-500/50 transition-all flex flex-col cursor-pointer transform hover:scale-105 duration-300 relative"
                     onClick={() => handleSelectVideo(video)}
                   >
-                    <div className="aspect-video relative overflow-hidden bg-black">
+                    <div className="aspect-video relative overflow-hidden bg-black rounded-2xl">
                       <img src={video.thumbnail} alt={video.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 opacity-60 group-hover:opacity-100" />
                       <div className="absolute inset-0 bg-gradient-to-t from-black to-transparent opacity-60"></div>
                       <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -304,7 +304,7 @@ export default function BuscarCenasPage() {
                          {isFav ? "❤️" : "🤍"}
                       </button>
                     </div>
-                    <div className="p-8 space-y-4">
+                    <div className="p-6 space-y-4">
                       <h3 className="text-sm font-black text-white line-clamp-2 leading-[1.3] uppercase italic tracking-tighter">{video.title}</h3>
                       <div className="flex items-center justify-between border-t border-white/5 pt-4">
                          <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest truncate max-w-[120px]">{video.channel}</span>

@@ -106,14 +106,14 @@ export default function DashboardPage() {
 
         <div className="lg:col-span-4 space-y-8">
            {/* USAGE LIMITS */}
-           <div className="bg-white dark:bg-gray-900 rounded-4xl border border-gray-100 dark:border-gray-800 p-10 shadow-2xl space-y-8">
+           <div className="bg-[#0a0a0a] rounded-3xl border border-white/5 p-10 shadow-2xl space-y-8">
               <h3 className="text-xl font-black text-white tracking-tighter uppercase italic">SaaS Power Metrics</h3>
               <div className="space-y-6">
                  <UsageBar label="Buscas (24h)" current={usage.searchesCount} max={limits.maxDailySearches} color="#3b82f6" />
                  <UsageBar label="Projetos" current={usage.projectsCount} max={limits.maxProjects} color="#8b5cf6" />
                  <UsageBar label="Renderizações" current={usage.rendersCount} max={limits.maxRenders} color="#10b981" />
               </div>
-              <Link href="/perfil" className="block"><Button className="w-full h-14 rounded-2xl border-white/10 font-black text-[10px] uppercase">Gerenciar Plano 💎</Button></Link>
+              <Link href="/perfil" className="block"><Button className="w-full h-14 rounded-2xl border-white/5 bg-white/5 text-gray-400 hover:text-white font-black text-[10px] uppercase transition-all">Gerenciar Plano 💎</Button></Link>
            </div>
 
            <ActivityLog />
@@ -166,18 +166,18 @@ function UsageBar({ label, current, max, color }: any) {
 
 function MetricCard({ title, value, icon, badge, color, trend }: any) {
   return (
-    <div className="bg-white/5 border border-white/10 p-8 rounded-[2.5rem] flex flex-col justify-between group h-52 hover:scale-[1.02] transition-all relative overflow-hidden">
+    <div className="bg-[#0d0d0d] border border-white/5 p-8 rounded-3xl flex flex-col justify-between group h-60 hover:scale-[1.03] transition-all relative overflow-hidden shadow-2xl">
        <div className="flex justify-between items-start relative z-10">
           <div>
-             <p className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em]">{title}</p>
-             <p className="text-[10px] font-black text-green-500 mt-1">{trend}</p>
+             <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] italic">{title}</p>
+             <p className="text-[11px] font-black text-blue-500 mt-2 uppercase tracking-widest">{trend}</p>
           </div>
-          <span className="w-12 h-12 bg-black rounded-2xl flex items-center justify-center text-xl shadow-inner" style={{ color }}>{icon}</span>
+          <span className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center text-2xl shadow-inner border border-white/5" style={{ color }}>{icon}</span>
        </div>
        <div className="relative z-10">
-          <p className="text-5xl font-black text-white items-baseline flex gap-4">{value} <span className="text-[10px] uppercase font-bold text-gray-600 bg-black px-2 py-1 rounded-lg">{badge}</span></p>
+          <p className="text-6xl font-black text-white items-baseline flex gap-4 tracking-tighter leading-none">{value} <span className="text-[11px] uppercase font-black text-gray-500 bg-white/5 px-3 py-1.5 rounded-full border border-white/5">{badge}</span></p>
        </div>
-       <div className="absolute -right-4 -bottom-4 w-24 h-24 opacity-5 border-[10px] border-current rounded-full" style={{ color }}></div>
+       <div className="absolute -right-6 -bottom-6 w-32 h-32 opacity-10 border-[15px] border-current rounded-full blur-2xl" style={{ color }}></div>
     </div>
   );
 }
