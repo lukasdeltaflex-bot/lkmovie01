@@ -13,13 +13,15 @@ export async function GET(request: Request) {
   const quality = searchParams.get("quality") as "any" | "high" | "standard" | null;
   const publishedAfter = searchParams.get("publishedAfter");
   const order = searchParams.get("order") as "relevance" | "date" | "viewCount" | "rating" | null;
+  const maxResultsParam = parseInt(searchParams.get("maxResults") || "50", 10);
+  const maxResults = Math.min(Math.max(maxResultsParam, 1), 50); // clamp 1-50
 
   if (!q || !q.trim()) {
     return NextResponse.json({ error: "O termo de busca 'q' é obrigatório." }, { status: 400 });
   }
 
   try {
-    const result = await searchYouTubeVideos(q.trim(), pageToken || undefined, 20, {
+    const result = await searchYouTubeVideos(q.trim(), pageToken || undefined, maxResults, {
       duration: duration || "any",
       quality: quality || "any",
       publishedAfter: publishedAfter || undefined,

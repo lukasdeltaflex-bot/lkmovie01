@@ -57,6 +57,8 @@ export default function BuscarCenasPage() {
   const { branding } = useBranding();
   const router = useRouter();
   const searchInputRef = useRef<HTMLInputElement>(null);
+  // Guarda o termo da última busca para que "carregar mais" use exatamente o mesmo
+  const lastSearchTermRef = useRef<string>("");
 
   useEffect(() => {
     if (user) {
@@ -73,36 +75,41 @@ export default function BuscarCenasPage() {
 
   const handleSearch = async (e?: React.FormEvent, customQuery?: string, isLoadMore = false) => {
     e?.preventDefault();
-    const baseTerm = customQuery || query;
+
+    // No "carregar mais" sempre reutiliza o termo da busca anterior
+    const baseTerm = isLoadMore ? lastSearchTermRef.current : (customQuery || query);
     if (!baseTerm.trim()) return;
 
     const searchTerm = baseTerm.trim();
 
-    if (branding && user) {
-      const { allowed, message } = canPerformAction(branding as any, "search");
-      if (!allowed) {
-        setError(message || "Limite de busca atingido.");
-        return;
+    if (!isLoadMore) {
+      // Só verifica limite na busca inicial
+      if (branding && user) {
+        const { allowed, message } = canPerformAction(branding as any, "search");
+        if (!allowed) {
+          setError(message || "Limite de busca atingido.");
+          return;
+        }
       }
-    }
-
-    if (isLoadMore) {
-      setLoadingMore(true);
-    } else {
+      // Salva o termo para paginações subsequentes
+      lastSearchTermRef.current = searchTerm;
       setLoading(true);
       setResults([]);
       setNextPageToken(null);
       setError(null);
+    } else {
+      setLoadingMore(true);
     }
 
     try {
       const url = new URL("/api/youtube/search", window.location.origin);
       url.searchParams.append("q", searchTerm);
-      
+      url.searchParams.append("maxResults", "50");
+
       if (filters.duration !== "any") url.searchParams.append("duration", filters.duration);
       if (filters.quality !== "any") url.searchParams.append("quality", filters.quality);
       if (filters.order !== "relevance") url.searchParams.append("order", filters.order);
-      
+
       if (filters.date !== "any") {
         const now = new Date();
         if (filters.date === "week") now.setDate(now.getDate() - 7);
@@ -319,13 +326,17 @@ export default function BuscarCenasPage() {
 
           {nextPageToken && !loading && (
             <div className="flex justify-center pt-12">
-               <Button 
+               <Button
                 variant="secondary"
                 onClick={() => handleSearch(undefined, undefined, true)}
                 disabled={loadingMore}
-                className="px-12 h-20 rounded-[2rem] font-black text-xs uppercase tracking-[0.3em] shadow-[0_0_30px_rgba(255,255,255,0.05)] hover:scale-105 transition-all bg-white text-black"
+                className="px-12 h-16 rounded-2xl font-black text-xs uppercase tracking-[0.3em] shadow-[0_0_30px_rgba(255,255,255,0.05)] hover:scale-105 active:scale-95 transition-all bg-white dark:bg-white text-black disabled:opacity-60 disabled:cursor-not-allowed disabled:scale-100 flex items-center gap-3"
                >
-                 {loadingMore ? "CARREGANDO..." : "CARREGAR GALERIA ➔"}
+                 {loadingMore ? (
+                   <><span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin inline-block"></span> CARREGANDO...</>
+                 ) : (
+                   <>CARREGAR MAIS CENAS ({results.length} exibidas) ➔</>
+                 )}
                </Button>
             </div>
           )}
